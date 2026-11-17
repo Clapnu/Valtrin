@@ -2,6 +2,14 @@
 
 Each release in short. Full notes are on the Modrinth page.
 
+## 23.9.5
+
+- Server: optional "Free Plan" / "Premium Plan" roles in your Discord server, matching each person's key. It makes small one-off requests to Discord only (no chat bot, no live connection, no message reading) and needs a bot token with Manage Roles. Off unless configured. Joining the Discord server is never required. Mod unchanged
+
+## 23.9.4
+
+- Server: Terms of Service (/terms) and Privacy Policy (/privacy) pages, linked from the project page. They say exactly what the server keeps. Mod unchanged
+
 ## 23.9.3
 
 - Server: a public project page at the server's address (what Valtrin is, what it never does, plans, privacy, link to get a key). Mod unchanged

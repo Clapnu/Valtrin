@@ -29,6 +29,7 @@ final class Api {
     private final Hub hub;
     private final InviteStore invites;
     private final DiscordLogin discord;
+    private final DiscordRoles roles;
     private final HttpServer server;
 
     /** ip -> {window start ms, failures in window}. */
@@ -44,18 +45,30 @@ final class Api {
         this.keys = keys;
         this.hub = hub;
         this.invites = invites;
+        this.roles = new DiscordRoles(cfg, keys, configDir);
         this.discord = new DiscordLogin(cfg, keys, this, configDir);
         server = HttpServer.create(new InetSocketAddress(cfg.bind, cfg.port), 128);
         server.setExecutor(Executors.newVirtualThreadPerTaskExecutor());
         server.createContext("/", this::handle);
     }
 
+    /** A Discord-linked key was made or changed: refresh the plan roles soon. */
+    void accountChanged() {
+        roles.poke();
+    }
+
+    DiscordRoles roles() {
+        return roles;
+    }
+
     void start() {
+        roles.start();
         server.start();
         Log.LOGGER.info("Listening on {}:{}", cfg.bind, cfg.port);
     }
 
     void stop() {
+        roles.stop();
         server.stop(1);
     }
 
@@ -66,6 +79,14 @@ final class Api {
             String first = ex.getRequestURI().getPath();
             if (("/".equals(first) || "/index.html".equals(first)) && "GET".equals(ex.getRequestMethod())) {
                 html(ex, 200, Pages.home(cfg.contactEmail));
+                return;
+            }
+            if ("/terms".equals(first) && "GET".equals(ex.getRequestMethod())) {
+                html(ex, 200, Pages.terms(cfg.contactEmail));
+                return;
+            }
+            if ("/privacy".equals(first) && "GET".equals(ex.getRequestMethod())) {
+                html(ex, 200, Pages.privacy(cfg.contactEmail));
                 return;
             }
             if ("/redeem".equals(first)) {

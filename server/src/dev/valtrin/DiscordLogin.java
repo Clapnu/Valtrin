@@ -194,6 +194,7 @@ final class DiscordLogin {
             return;
         }
         Log.LOGGER.info("Key made for a Discord account (id {})", discordId);
+        api.accountChanged();
         Api.html(ex, 200, Pages.yourKey(key, cfg.publicUrl, "If you sign in again later you get a new key and this one stops working."));
     }
 

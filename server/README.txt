@@ -53,3 +53,19 @@ Tests:
 Running it: see tools/servertest/install-service.sh (starts by itself, restarts if it stops) and the steps in the
 release notes. The mod needs https:// to talk to a real server (http:// only works for localhost), so a domain name is
 needed before other people can connect.
+
+
+PLAN ROLES ON DISCORD (optional)
+--------------------------------
+Gives people who are in your Discord server a "Free Plan" or "Premium Plan" role that matches their key. It is not a chat bot:
+it makes small one-off requests to Discord and never reads messages. Nobody has to join your Discord to get a key.
+1. Discord Developer Portal > your application > Bot > create the bot (no special "intents" are needed). Copy its token.
+2. Invite it to your server with the Manage Roles permission, then drag the bot's role ABOVE the Free Plan and Premium Plan roles
+   in Server Settings > Roles (Discord only lets a bot change roles below its own).
+3. Put the token in a file only the server's user can read. Do NOT paste it anywhere else:
+       nano ~/valtrin-data/config/discord-bot-token.txt     (paste the token, save)
+       chmod 600 ~/valtrin-data/config/discord-bot-token.txt
+4. In config/valtrin-server.properties set discordRoleGuildId (the server's id), discordFreeRoleId and discordPremiumRoleId
+   (right-click each > Copy ID, with Developer Mode on). Restart the server. The log says "Plan roles on Discord are on".
+Roles are checked a few seconds after someone signs in and then every 5 minutes. People who join the Discord later get theirs
+within about 30 minutes. A cancelled key loses the role the next time the server checks (not after a server restart).

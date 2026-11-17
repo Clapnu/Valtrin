@@ -141,8 +141,63 @@ final class Pages {
                 + "<li>Keys are stored only as irreversible hashes.</li>"
                 + "<li>Server logs record connection times and IP addresses for security and abuse control. They are not shared or sold.</li></ul>"
                 + contact
-                + "<p class=fine style='text-align:left'>Valtrin is a client-side Fabric mod for Minecraft Java Edition. It is free to use.</p>",
+                + "<p class=fine style='text-align:left'>Valtrin is a client-side Fabric mod for Minecraft Java Edition. It is free to use. "
+                + "<a href=/terms>Terms of Service</a> &middot; <a href=/privacy>Privacy Policy</a></p>",
                 false, true);
+    }
+
+    private static String contactLine(String contactEmail) {
+        return contactEmail.isEmpty() ? "" : "<p>Questions, or a request to delete your data: <code>" + esc(contactEmail) + "</code></p>";
+    }
+
+    /** Terms of Service, linked from the Discord application settings. Plain language, accurate to what the server does. */
+    static String terms(String contactEmail) {
+        return page("Valtrin: Terms of Service", ""
+                + "<h1>Terms of Service</h1><p class=sub>Last updated 17 November 2026</p>"
+                + "<p>These terms cover the Valtrin alert service (this server and the Valtrin mod). By getting a key or using the service you agree to them.</p>"
+                + "<h2>What the service is</h2><p>Valtrin shows estimates of Hypixel SkyBlock Auction House flips. The estimates are information only. "
+                + "They can be wrong or out of date, and nothing here is a promise of profit. You decide whether to buy, and you carry any loss.</p>"
+                + "<h2>Your key</h2><ul class=list>"
+                + "<li>A key is for one person. Do not share it, sell it or publish it. One key can be connected at a time.</li>"
+                + "<li>Keep it private. Anyone who has it can use your connection.</li>"
+                + "<li>You must meet Discord's minimum age to sign in with Discord.</li></ul>"
+                + "<h2>What you agree not to do</h2><ul class=list>"
+                + "<li>Do not attack, overload, scan or try to break the service, and do not try to get around its limits or delays.</li>"
+                + "<li>Do not copy, resell or republish the alert stream, or use it to run a competing service.</li>"
+                + "<li>Do not use it in a way that breaks Hypixel's or Minecraft's rules. Valtrin never plays the game for you; keep it that way.</li></ul>"
+                + "<h2>Free and paid use</h2><p>Free use gives every alert with a 15 second delay. A paid option without the delay is planned and will be offered only "
+                + "if Hypixel allows it. Nothing is charged today.</p>"
+                + "<h2>Changes, access and ending</h2><p>The service is provided as it is, with no promise that it will always be available or accurate. "
+                + "Keys can be limited or cancelled, for example for abuse. The service or these terms may change; the date above shows the latest version. "
+                + "To the extent the law allows, Valtrin is not liable for losses from using the service.</p>"
+                + "<h2>Not affiliated</h2><p>Valtrin is not affiliated with, endorsed by or connected to Hypixel Inc. or Mojang/Microsoft. Hypixel and Minecraft are trademarks of their owners.</p>"
+                + contactLine(contactEmail)
+                + "<p><a href=/>&larr; Back</a> &middot; <a href=/privacy>Privacy Policy</a></p>", false, true);
+    }
+
+    /** Privacy Policy, linked from the Discord application settings. Describes exactly what the server stores. */
+    static String privacy(String contactEmail) {
+        return page("Valtrin: Privacy Policy", ""
+                + "<h1>Privacy Policy</h1><p class=sub>Last updated 17 November 2026</p>"
+                + "<p>This explains what the Valtrin server keeps about you. The short version: very little.</p>"
+                + "<h2>What we keep</h2><ul class=list>"
+                + "<li><b>Discord account number</b> (only if you sign in with Discord) and the time your key was made. This lets us give one key per person. "
+                + "We do not keep your Discord name, email, avatar, friends or servers, and we do not keep Discord login tokens.</li>"
+                + "<li><b>Your key</b>, stored only as an irreversible hash, with its plan and whether it is active.</li>"
+                + "<li>If you are also in the Valtrin Discord server, the server may give you a \"Free Plan\" or \"Premium Plan\" role there that matches your key. It does this using your Discord account number only, and joining the Discord server is never required.</li>"
+                + "<li><b>Security logs</b> with connection times and IP addresses, used to stop abuse and to fix problems. They are kept for a limited time.</li></ul>"
+                + "<h2>What we do not keep</h2><ul class=list>"
+                + "<li>Your Minecraft login, session or password, or your in-game name or activity. The mod does not send them to this server.</li>"
+                + "<li>Your alert settings. Filters you choose in the mod are applied on your own computer.</li>"
+                + "<li>Any Hypixel API key. The service does not use or collect one.</li></ul>"
+                + "<h2>Discord sign-in</h2><p>When you sign in with Discord we ask only for your public account number (the identify permission). "
+                + "Discord's own privacy policy applies to your Discord account.</p>"
+                + "<h2>Who sees it</h2><p>Nobody else. We do not sell or share this information or use it for advertising. "
+                + "The server is hosted on a rented virtual server; it is handled only by the person who runs Valtrin, except where the law requires otherwise.</p>"
+                + "<h2>Your choices</h2><p>You can ask us to delete your key and the stored Discord account number at any time. After that you can get a new key by signing in again.</p>"
+                + "<h2>Changes</h2><p>If this changes, the date above changes. Valtrin is not directed at children under Discord's minimum age.</p>"
+                + contactLine(contactEmail)
+                + "<p><a href=/>&larr; Back</a> &middot; <a href=/terms>Terms of Service</a></p>", false, true);
     }
 
     static String error(String title, String message) {

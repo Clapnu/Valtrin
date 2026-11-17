@@ -188,6 +188,17 @@ public final class ServerTests {
         HttpResponse<String> homePage = HTTP.send(HttpRequest.newBuilder(URI.create(base + "/")).GET().build(), HttpResponse.BodyHandlers.ofString());
         check("project page is public", homePage.statusCode() == 200 && homePage.body().contains("never buys") && homePage.body().contains("not affiliated with or endorsed by Hypixel"));
         check("project page has no script and a strict policy", !homePage.body().contains("<script") && homePage.headers().firstValue("Content-Security-Policy").orElse("").contains("default-src 'none'"));
+        for (String lpath : new String[]{"/terms", "/privacy"}) {
+            HttpResponse<String> lp = HTTP.send(HttpRequest.newBuilder(URI.create(base + lpath)).GET().build(), HttpResponse.BodyHandlers.ofString());
+            check(lpath + " page is public, has no script, strict policy", lp.statusCode() == 200 && !lp.body().contains("<script")
+                && lp.headers().firstValue("Content-Security-Policy").orElse("").contains("default-src 'none'"));
+        }
+        HttpResponse<String> termsPage = HTTP.send(HttpRequest.newBuilder(URI.create(base + "/terms")).GET().build(), HttpResponse.BodyHandlers.ofString());
+        HttpResponse<String> privacyPage = HTTP.send(HttpRequest.newBuilder(URI.create(base + "/privacy")).GET().build(), HttpResponse.BodyHandlers.ofString());
+        check("terms page says not affiliated and no promise of profit", termsPage.body().contains("not affiliated with, endorsed by") && termsPage.body().contains("promise of profit"));
+        check("privacy page says what is kept and what is not", privacyPage.body().contains("Discord account number") && privacyPage.body().contains("Any Hypixel API key"));
+        check("home page links to terms and privacy", homePage.body().contains("href=/terms") && homePage.body().contains("href=/privacy"));
+        check("post to /terms is refused", post(base + "/terms", "application/x-www-form-urlencoded", "a=b").statusCode() >= 400);
         check("post to / is refused", post(base + "/", "application/x-www-form-urlencoded", "a=b").statusCode() == 401 || post(base + "/", "application/x-www-form-urlencoded", "a=b").statusCode() == 405);
         check("redeem page opens without a key", rpage.statusCode() == 200 && rpage.body().contains("<form"));
         check("redeem page has a strict content policy", rpage.headers().firstValue("Content-Security-Policy").orElse("").contains("default-src 'none'")
@@ -295,12 +306,23 @@ public final class ServerTests {
             byte[] out = (json == null ? "{}" : json).getBytes();
             x.sendResponseHeaders(json == null ? 401 : 200, out.length); x.getResponseBody().write(out); x.close();
         });
+        final String ghostId = "800000000000000001", premId = "810000000000000001", freeRole = "880000000000000001", premRole = "880000000000000002";
+        final String botToken = "test-bot-token-0123456789abcdefghijkl";
+        final java.util.List<String> roleCalls = java.util.Collections.synchronizedList(new java.util.ArrayList<>());
+        fake.createContext("/guilds/770000000000000007/members/", x -> {
+            String path = x.getRequestURI().getPath();
+            roleCalls.add(x.getRequestMethod() + " " + path + " auth=" + x.getRequestHeaders().getFirst("Authorization"));
+            x.sendResponseHeaders(path.contains("/" + ghostId + "/") ? 404 : 204, -1);
+            x.close();
+        });
         fake.start();
         api.stop();
         Files.writeString(dir.resolve("config/discord-secret.txt"), "test-secret-0123456789abcdef\n");
+        Files.writeString(dir.resolve("config/discord-bot-token.txt"), botToken + "\n");
         Files.writeString(dir.resolve("config/valtrin-server.properties"), "port=" + (port + 3) + "\nfreeDelaySeconds=1\nmaxFailsPerMinute=50\n"
                 + "publicUrl=http://127.0.0.1:" + (port + 3) + "\ndiscordClientId=123456789012345678\ndiscordGuildId=555\ndiscordMinAccountDays=7\n"
-                + "discordApiBase=http://127.0.0.1:" + fake.getAddress().getPort() + "\n");
+                + "discordApiBase=http://127.0.0.1:" + fake.getAddress().getPort() + "\n"
+                + "discordRoleGuildId=770000000000000007\ndiscordFreeRoleId=" + freeRole + "\ndiscordPremiumRoleId=" + premRole + "\n");
         st = ServerSettings.load(dir.resolve("config"));
         hub = new Hub(st);
         api = new Api(st, keys, hub, new InviteStore(dir.resolve("config/invites.tsv")), dir.resolve("config"));
@@ -362,6 +384,25 @@ public final class ServerTests {
         check("later sign-in gives a new key", again.statusCode() == 200 && dk2 != null && !dk2.equals(dk1));
         check("the old key stops working, the new one works", status(base + "/ping", dk1, "GET") == 401 && status(base + "/ping", dk2, "GET") == 200);
         check("callback without parameters is handled", callback.apply(new String[]{null}, "").statusCode() == 400);
+        // ---- plan roles on Discord (REST only, no bot connection)
+        String freePut = "PUT /guilds/770000000000000007/members/" + oldId + "/roles/" + freeRole + " auth=Bot " + botToken;
+        for (int i = 0; i < 80 && !roleCalls.contains(freePut); i++) Thread.sleep(100);
+        check("sign-in gives the Free Plan role (sent with the bot token)", roleCalls.contains(freePut));
+        keys.add(KeyStore.Tier.PREMIUM, "discord-" + premId);
+        keys.add(KeyStore.Tier.FREE, "discord-" + ghostId);
+        api.roles().sweep();
+        check("a premium key gets the Premium Plan role and loses the Free one", roleCalls.contains("PUT /guilds/770000000000000007/members/" + premId + "/roles/" + premRole + " auth=Bot " + botToken)
+            && roleCalls.contains("DELETE /guilds/770000000000000007/members/" + premId + "/roles/" + freeRole + " auth=Bot " + botToken));
+        check("someone who is not in the Discord server is skipped without trouble", roleCalls.stream().filter(s -> s.startsWith("PUT /guilds/770000000000000007/members/" + ghostId)).count() == 1);
+        api.roles().sweep();
+        check("a not-in-server account is not asked about again right away", roleCalls.stream().filter(s -> s.startsWith("PUT /guilds/770000000000000007/members/" + ghostId)).count() == 1);
+        keys.revoke("discord-" + premId);
+        api.roles().sweep();
+        check("a cancelled key loses both plan roles", roleCalls.contains("DELETE /guilds/770000000000000007/members/" + premId + "/roles/" + premRole + " auth=Bot " + botToken)
+            && roleCalls.stream().filter(s -> s.startsWith("DELETE /guilds/770000000000000007/members/" + premId + "/roles/" + freeRole)).count() >= 1);
+        check("every role request carried the bot token and nothing else leaked", roleCalls.stream().allMatch(s -> s.endsWith("auth=Bot " + botToken)));
+        java.nio.file.Path noTokenDir = Files.createTempDirectory("valtrin-notoken");
+        check("plan roles stay off without a bot token", !new DiscordRoles(st, keys, noTokenDir).enabled() && api.roles().enabled());
         fake.stop(0);
         api.stop();
         System.out.println("server tests: passed " + pass + ", failed " + fail);

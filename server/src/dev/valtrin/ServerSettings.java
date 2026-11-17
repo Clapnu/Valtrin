@@ -23,6 +23,10 @@ final class ServerSettings {
     final String discordClientId;
     /** Optional: only members of this Discord server may get a key. */
     final String discordGuildId;
+    /** Optional: the Discord server where plan roles are given, and the ids of the Free and Premium roles. */
+    final String discordRoleGuildId;
+    final String discordFreeRoleId;
+    final String discordPremiumRoleId;
     final int discordMinAccountDays;
     /** Discord's web address; only changed by the tests. */
     final String discordApiBase;
@@ -43,6 +47,9 @@ final class ServerSettings {
         publicUrl = p.getProperty("publicUrl", "").trim().replaceAll("/+$", "");
         discordClientId = p.getProperty("discordClientId", "").trim();
         discordGuildId = p.getProperty("discordGuildId", "").trim();
+        discordRoleGuildId = p.getProperty("discordRoleGuildId", "").trim();
+        discordFreeRoleId = p.getProperty("discordFreeRoleId", "").trim();
+        discordPremiumRoleId = p.getProperty("discordPremiumRoleId", "").trim();
         discordMinAccountDays = intIn(p, "discordMinAccountDays", 7, 0, 3650);
         discordApiBase = p.getProperty("discordApiBase", "https://discord.com/api").trim().replaceAll("/+$", "");
         String ce = p.getProperty("contactEmail", "").trim();
@@ -93,6 +100,11 @@ final class ServerSettings {
                         contactEmail=
                         discordClientId=
                         discordGuildId=
+                        # Optional: give people in your Discord server a Free Plan / Premium Plan role that matches their key.
+                        # Needs config/discord-bot-token.txt (a bot with the Manage Roles permission). Never required to use Valtrin.
+                        discordRoleGuildId=
+                        discordFreeRoleId=
+                        discordPremiumRoleId=
                         discordMinAccountDays=7
                         redeemPerAddressPerDay=5
                         """);
