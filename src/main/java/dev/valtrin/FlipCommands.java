@@ -81,7 +81,7 @@ final class FlipCommands {
                 .then(literal("preset").then(argument("name", StringArgumentType.word()).executes(c -> {
                     String n = StringArgumentType.getString(c, "name");
                     if (!FlipConfig.applyPreset(n)) {
-                        reply(c.getSource(), "Presets: safe, balanced, aggressive.", ChatFormatting.RED);
+                        reply(c.getSource(), "Presets: safe, balanced, risky.", ChatFormatting.RED);
                         return 0;
                     }
                     FlipConfig.save();
@@ -461,7 +461,7 @@ final class FlipCommands {
         src.sendFeedback(cmd("/flip mute", "/flip mute", "stop alerts for the item of your latest alert"));
         src.sendFeedback(cmd("/flip export", "/flip export", "save your finished flips as a CSV file"));
         src.sendFeedback(cmd("/flip doctor", "/flip doctor", "health check with a pass or warning for each part"));
-        src.sendFeedback(cmd("/flip preset", "/flip preset balanced", "filter presets: safe, balanced, aggressive"));
+        src.sendFeedback(cmd("/flip preset", "/flip preset balanced", "filter presets: safe, balanced, risky"));
         src.sendFeedback(cmd("/flip session", "/flip session", "this session: alerts, flips, profit per hour"));
         src.sendFeedback(cmd("/flip recent", "/flip recent", "your last alerts, click to open"));
         src.sendFeedback(cmd("/flip menu", "/flip menu", "open the settings screen (or press the . key)"));

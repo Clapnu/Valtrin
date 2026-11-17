@@ -153,7 +153,8 @@ public final class SecurityTests {
         // ---- presets
         try {
             check("preset safe", FlipConfig.applyPreset("Safe") && FlipConfig.currentPreset().equals("Safe"));
-            check("preset aggressive", FlipConfig.applyPreset("aggressive") && FlipConfig.currentPreset().equals("Aggressive"));
+            check("preset risky", FlipConfig.applyPreset("risky") && FlipConfig.currentPreset().equals("Risky"));
+            check("old preset name aggressive still works", FlipConfig.applyPreset("aggressive") && FlipConfig.currentPreset().equals("Risky"));
             check("preset balanced", FlipConfig.applyPreset("BALANCED") && FlipConfig.currentPreset().equals("Balanced"));
             check("preset unknown rejected", !FlipConfig.applyPreset("../x") && !FlipConfig.applyPreset(null));
             FlipConfig.INSTANCE.minProfit = 123;

@@ -2,6 +2,10 @@
 
 Each release in short. Full notes are on the Modrinth page.
 
+## 23.9.6
+
+- The "Aggressive" filter preset is now called "Risky", because it lowers every bar (profit, margin, sales per day, confidence) and so shows more alerts that are smaller, slower or less certain. `/flip preset aggressive` still works
+
 ## 23.9.5
 
 - Server: optional "Free Plan" / "Premium Plan" roles in your Discord server, matching each person's key. It makes small one-off requests to Discord only (no chat bot, no live connection, no message reading) and needs a bot token with Manage Roles. Off unless configured. Joining the Discord server is never required. Mod unchanged

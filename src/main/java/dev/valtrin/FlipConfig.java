@@ -215,16 +215,16 @@ public final class FlipConfig {
     static final String[][] PRESETS = {
             {"Safe", "Fewer, surer flips: 1M profit, 10% margin, 20 sales/day, high confidence."},
             {"Balanced", "The recommended defaults: 300K profit, 8% margin, 10 sales/day, medium confidence."},
-            {"Aggressive", "More alerts: 100K profit, 5% margin, 5 sales/day, any confidence."},
+            {"Risky", "Lots of alerts, including smaller, slower and less certain flips: 100K profit, 5% margin, 5 sales/day, any confidence."},
     };
 
-    /** Sets the filters of a preset (Safe, Balanced, Aggressive). Returns false for an unknown name. */
+    /** Sets the filters of a preset (Safe, Balanced, Risky; "aggressive" still works as the old name for Risky). Returns false for an unknown name. */
     static boolean applyPreset(String name) {
         FlipConfig c = INSTANCE;
         switch (name == null ? "" : name.toLowerCase(java.util.Locale.ROOT)) {
             case "safe" -> { c.minProfit = 1_000_000; c.minMarginPercent = 10; c.minVolume = 20; c.minListings = 2; c.minConfidence = "high"; }
             case "balanced" -> { FlipConfig d = new FlipConfig(); c.minProfit = d.minProfit; c.minMarginPercent = d.minMarginPercent; c.minVolume = d.minVolume; c.minListings = d.minListings; c.minConfidence = "med"; }
-            case "aggressive" -> { c.minProfit = 100_000; c.minMarginPercent = 5; c.minVolume = 5; c.minListings = 1; c.minConfidence = "low"; }
+            case "risky", "aggressive" -> { c.minProfit = 100_000; c.minMarginPercent = 5; c.minVolume = 5; c.minListings = 1; c.minConfidence = "low"; }
             default -> { return false; }
         }
         return true;
@@ -243,7 +243,7 @@ public final class FlipConfig {
         FlipConfig c = INSTANCE;
         if (c.minProfit == 1_000_000 && c.minMarginPercent == 10 && c.minVolume == 20 && c.minListings == 2 && "high".equals(c.minConfidence)) return "Safe";
         if (c.minProfit == 300_000 && c.minMarginPercent == 8 && c.minVolume == 10 && c.minListings == 2 && "med".equals(c.minConfidence)) return "Balanced";
-        if (c.minProfit == 100_000 && c.minMarginPercent == 5 && c.minVolume == 5 && c.minListings == 1 && "low".equals(c.minConfidence)) return "Aggressive";
+        if (c.minProfit == 100_000 && c.minMarginPercent == 5 && c.minVolume == 5 && c.minListings == 1 && "low".equals(c.minConfidence)) return "Risky";
         return "Custom";
     }
 
@@ -274,7 +274,7 @@ public final class FlipConfig {
     }
 
     /** The mod version shown in the settings screen and the welcome window (keep equal to fabric.mod.json). */
-    public static final String VERSION = "23.9.5";
+    public static final String VERSION = "23.9.6";
 
     /** A copy of the current settings, so the settings screen can undo its changes with Cancel. */
     static FlipConfig snapshot() {

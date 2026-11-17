@@ -49,7 +49,7 @@ Valtrin is a client-side Fabric mod that watches Hypixel's public auction data a
 - `/flip export` saves your finished flips as a CSV file
 
 ### Tuning
-- **Presets:** Safe, Balanced and Aggressive set the filters together
+- **Presets:** Safe, Balanced and Risky set the filters together
 - **Quiet hours:** no alert sounds during hours you choose, while alerts still show
 - **Mute:** `/flip mute` stops alerts for the item of your latest alert
 - `/flip doctor` checks the connection, data, clock and settings and prints a pass or warning for each
@@ -75,7 +75,7 @@ Valtrin is a client-side Fabric mod that watches Hypixel's public auction data a
 | `/flip recent` | Your last alerts, click to open |
 | `/flip export` | Save finished flips as a CSV |
 | `/flip mute` | Stop alerts for your latest alert's item |
-| `/flip preset <name>` | Safe, balanced or aggressive filters |
+| `/flip preset <name>` | Safe, balanced or risky filters |
 | `/flip doctor` | Health check |
 | `/flip status` | Speed, data and connection |
 | `/flip set <option> <value>` | Change any setting from chat |
