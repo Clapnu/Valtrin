@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "id": "valtrin",
+  "version": "23.9.3",
+  "name": "Valtrin",
+  "description": "Client-side Hypixel SkyBlock auction flip alerts with customizable filters. Alerts only - no automation.",
+  "authors": [
+    "Valtrin"
+  ],
+  "license": "All-Rights-Reserved",
+  "environment": "client",
+  "entrypoints": {
+    "client": [
+      "dev.valtrin.ValtrinMod"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=0.18.0",
+    "minecraft": ">=26.1",
+    "java": ">=25",
+    "fabric-api": "*"
+  },
+  "mixins": [
+    "valtrin.mixins.json"
+  ]
+}

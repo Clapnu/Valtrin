@@ -1,0 +1,12 @@
+Copyright (c) 2026 Valtrin. All rights reserved.
+
+This source code and everything in this repository (code, text, sounds, images and documentation) is the property of
+Valtrin. It is published so it can be read and reviewed. No licence or permission is granted to copy, modify, publish,
+distribute, sublicense, sell, or use it in other projects, mods or services, in whole or in part, without written
+permission from Valtrin.
+
+Reading the code to learn how it works is welcome. Reporting a security problem is welcome (see SECURITY.md).
+
+Third-party data and names remain the property of their owners: Hypixel and Minecraft are trademarks of their
+respective owners and Valtrin is not affiliated with them. Crafting recipe data comes from the NotEnoughUpdates item
+repository (MIT licence, see DATA_SOURCES.md).

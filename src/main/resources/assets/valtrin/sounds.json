@@ -1,0 +1,7 @@
+{
+  "jackpot": {
+    "sounds": [
+      { "name": "valtrin:jackpot", "stream": false }
+    ]
+  }
+}

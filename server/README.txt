@@ -1,0 +1,55 @@
+Valtrin server
+==============
+
+What it is: the mod's engine without Minecraft, plus a small web interface. It reads public Hypixel data once,
+records sold auctions and auction snapshots, finds flips with the mod's own pricing code, and sends each flip to every
+connected mod (after that key's delay). It never buys anything and never sends commands to anyone.
+
+Web interface (all need the header  X-Key: <access key>, GET only):
+    /v1/stream      alerts, as server-sent events (events: hello, flip, notice). One connection per key.
+    /ping           "ok"
+    /sales, /coverage    the sold-auction history the mods use for pricing (same as the old recorder)
+
+Settings: config/valtrin-server.properties (made on first start, inside the data folder given by -Duser.home):
+    bind=127.0.0.1          keep this when Caddy (HTTPS) is in front
+    port=8080
+    freeDelaySeconds=15     delay for FREE keys
+    premiumEnabled=false    premium keys get no delay ONLY when this is true; leave false until Hypixel has approved selling
+    maxSessions=300
+    maxFailsPerMinute=20    wrong-key attempts per address before it is blocked for the rest of the minute
+
+Access keys (a key is shown once; only its hash is stored, in config/keys.tsv):
+    java -Duser.home=/home/valtrin/valtrin-data -jar valtrin-server.jar keys add free  "friend-name"
+    java -Duser.home=/home/valtrin/valtrin-data -jar valtrin-server.jar keys add premium "customer-name"
+    java -Duser.home=/home/valtrin/valtrin-data -jar valtrin-server.jar keys list
+    java -Duser.home=/home/valtrin/valtrin-data -jar valtrin-server.jar keys revoke "friend-name"
+Sign in with Discord (automatic keys, recommended). One-time setup:
+  1. discord.com/developers/applications -> New Application. Copy the Application (client) ID.
+  2. OAuth2 page: copy the Client Secret (shown once). Add the redirect  https://YOUR-DOMAIN/auth/discord/callback
+  3. On the server, store the secret without showing it:
+       read -s -p "Secret: " S && printf '%s' "$S" > ~/valtrin-data/config/discord-secret.txt && chmod 600 ~/valtrin-data/config/discord-secret.txt && unset S
+  4. Add to config/valtrin-server.properties:  publicUrl=https://YOUR-DOMAIN  discordClientId=THE-ID
+     optional:  discordGuildId=YOUR-DISCORD-SERVER-ID  (only its members get keys)   discordMinAccountDays=7
+  5. Restart the server; the log says "Sign in with Discord is on". People open https://YOUR-DOMAIN/redeem and click the button.
+One key per Discord account; signing in again (after an hour) gives a new key and cancels the old one.
+
+Invite codes (people get their own FREE key without you typing a command for each):
+    ... -jar valtrin-server.jar invites add 20          20 single-use codes, valid 30 days
+    ... -jar valtrin-server.jar invites add 1 20 7      ONE code that 20 people can use, valid 7 days
+    ... -jar valtrin-server.jar invites list            usage (shows an id for each code, not the code)
+    ... -jar valtrin-server.jar invites revoke ID       cancel a code (use the id from the list)
+Send each person a code and the link  https://your-domain/redeem . They enter the code and a name and get their key,
+shown once. A code can only make FREE keys. Each address can make at most redeemPerAddressPerDay keys a day (default 5).
+Turn the page off with redeemEnabled=false.
+
+Changes apply within seconds, no restart. A revoked key's open connection ends within 15 seconds.
+
+Build (only needed if you change the code; a ready jar is sent with each release):
+    bash server/build.sh          needs a JDK and the Gson jar (set GSON=/path/to/gson-2.10.jar)
+Tests:
+    javac -cp server/build/classes -d /tmp/st server/test/ServerTests.java
+    java -Duser.home=/tmp/sthome -cp /tmp/st:server/build/classes dev.valtrin.ServerTests
+
+Running it: see tools/servertest/install-service.sh (starts by itself, restarts if it stops) and the steps in the
+release notes. The mod needs https:// to talk to a real server (http:// only works for localhost), so a domain name is
+needed before other people can connect.
