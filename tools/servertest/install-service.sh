@@ -18,7 +18,7 @@ Wants=network-online.target
 [Service]
 User=$U
 WorkingDirectory=/home/$U/valtrin-server
-ExecStart=$JAVA -Xmx1200m -Duser.home=/home/$U/valtrin-data -jar $JAR
+ExecStart=$JAVA -Xmx1200m -XX:+UseSerialGC -XX:MinHeapFreeRatio=10 -XX:MaxHeapFreeRatio=30 -XX:+ExitOnOutOfMemoryError -Duser.home=/home/$U/valtrin-data -jar $JAR
 Restart=always
 RestartSec=3
 NoNewPrivileges=true

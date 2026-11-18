@@ -5,9 +5,12 @@ What it is: the mod's engine without Minecraft, plus a small web interface. It r
 records sold auctions and auction snapshots, finds flips with the mod's own pricing code, and sends each flip to every
 connected mod (after that key's delay). It never buys anything and never sends commands to anyone.
 
-Web interface (all need the header  X-Key: <access key>, GET only):
+Web interface (all need the header  X-Key: <access key>; GET, except where noted):
     /v1/stream      alerts, as server-sent events (events: hello, flip, notice). One connection per key.
     /ping           "ok"
+    /v1/flips       recent flips as JSON for the website (needs X-Key, delay and history follow the plan, no seller names; browser access only from siteOrigin)
+    /v1/craft       crafts that currently look profitable, as JSON for the website (premium keys only, same browser rule as /v1/flips)
+    /v1/stats       completed flips a player chose to share from the mod (premium keys only): POST from the mod, GET and DELETE from the website
     /sales, /coverage    the sold-auction history the mods use for pricing (same as the old recorder)
 
 Settings: config/valtrin-server.properties (made on first start, inside the data folder given by -Duser.home):
@@ -32,6 +35,12 @@ Sign in with Discord (automatic keys, recommended). One-time setup:
      optional:  discordGuildId=YOUR-DISCORD-SERVER-ID  (only its members get keys)   discordMinAccountDays=7
   5. Restart the server; the log says "Sign in with Discord is on". People open https://YOUR-DOMAIN/redeem and click the button.
 One key per Discord account; signing in again (after an hour) gives a new key and cancels the old one.
+
+Discord auction commands (/auctions, /link, /unlink, /notify) work with the same bot token and application id as the other
+commands, and need no new settings. /auctions draws a picture, which needs a font on the server. If the log line after start says
+"Auction pictures: this machine cannot draw text", run:  sudo apt-get install -y fontconfig fonts-dejavu-core  and restart; until then it
+answers in plain text. Data comes only from Hypixel's public auction feeds the server already reads (no Hypixel key). Sales are kept in
+memory for 36 hours, so they start empty after a restart. Links (Discord id, Minecraft name, DM on/off) are in config/discord-links.tsv.
 
 Invite codes (people get their own FREE key without you typing a command for each):
     ... -jar valtrin-server.jar invites add 20          20 single-use codes, valid 30 days

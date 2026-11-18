@@ -40,6 +40,8 @@ final class Pricing {
     /** item id -> cost of each dungeon star (index 0 = first star), from Hypixel's item resource. */
     static volatile Map<String, List<List<Cost>>> starCosts = Map.of();
     static volatile long bazaarAt = 0;
+    /** product id -> units sold over the last 7 days (Hypixel's sellMovingWeek), for Bazaar volume. */
+    static volatile Map<String, Double> bazaarWeek = Map.of();
     static volatile long itemsAt = 0;
     /** 7-day history of enchanted book prices, built by the mod while it runs. */
     static final BazaarHistory history = new BazaarHistory();
@@ -68,6 +70,7 @@ final class Pricing {
         if (products == null) return;
         Map<String, Double> out = new HashMap<>();
         Map<String, double[]> both = new HashMap<>();
+        Map<String, Double> week = new HashMap<>();
         for (Map.Entry<String, JsonElement> e : products.entrySet()) {
             JsonObject p = e.getValue().getAsJsonObject();
             JsonObject qs = p.getAsJsonObject("quick_status");
@@ -77,9 +80,11 @@ final class Pricing {
             double avg = (buy > 0 && sell > 0) ? (buy + sell) / 2.0 : Math.max(buy, sell);
             if (avg > 0) out.put(e.getKey(), avg);
             both.put(e.getKey(), new double[]{buy, sell});
+            week.put(e.getKey(), num(qs, "sellMovingWeek"));
         }
         if (!out.isEmpty()) {
             bazaar = out;
+            bazaarWeek = week;
             bazaarAt = Clock.now();
             history.record(both, bazaarAt);
         }

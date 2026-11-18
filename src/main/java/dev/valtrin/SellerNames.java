@@ -76,6 +76,15 @@ final class SellerNames {
         return hit == null || hit.isEmpty() ? null : hit;
     }
 
+    /** {uuid, exact name} for a name already known from earlier lookups, ignoring capital letters; null if not known. */
+    static String[] byName(String name) {
+        if (name == null || !Validate.player(name)) return null;
+        for (Map.Entry<String, String> e : CACHE.entrySet()) {
+            if (e.getValue().equalsIgnoreCase(name)) return new String[]{e.getKey(), e.getValue()};
+        }
+        return null;
+    }
+
     private static void rewrite(Path f) {
         try {
             StringBuilder sb = new StringBuilder();

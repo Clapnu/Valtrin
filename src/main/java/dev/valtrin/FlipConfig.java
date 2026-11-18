@@ -109,6 +109,8 @@ public final class FlipConfig {
     public String sharedKey = "";
     /** Receive flip alerts from the Valtrin server (address and key above) instead of searching on this computer. */
     public boolean useServerAlerts = false;
+    /** Send completed flips (time, item, coins paid and received) to your Valtrin server for the Flip Stats page. Off unless you turn it on. */
+    public boolean reportStats = false;
 
     /** A file in the config folder; moves it from its pre-rename name if only that one exists. */
     static Path configFile(String name, String... legacy) {
@@ -274,7 +276,7 @@ public final class FlipConfig {
     }
 
     /** The mod version shown in the settings screen and the welcome window (keep equal to fabric.mod.json). */
-    public static final String VERSION = "23.9.6";
+    public static final String VERSION = "23.9.7";
 
     /** A copy of the current settings, so the settings screen can undo its changes with Cancel. */
     static FlipConfig snapshot() {

@@ -47,6 +47,10 @@ public final class ServerMain {
         FlipEngine engine = new FlipEngine(volume, sink);
         engine.start();
         Api api = new Api(settings, keys, sink, invites, home.resolve("config"));
+        CraftFlips crafts = new CraftFlips(home.resolve("ValtrinData"));
+        api.setCrafts(crafts);
+        api.setStats(new StatsStore(home.resolve("ValtrinData")));
+        crafts.start();
         api.start();
         Log.LOGGER.info("Keys: {} | free delay {} s | premium {}", keys.count(), settings.freeDelayMs / 1000,
                 settings.premiumEnabled ? "ENABLED" : "off (premium keys get the free delay)");
@@ -77,7 +81,7 @@ public final class ServerMain {
 
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             Log.LOGGER.info("Valtrin server stopping");
-            try { api.stop(); engine.stop(); } catch (Throwable ignored) {}
+            try { api.stop(); crafts.stop(); engine.stop(); } catch (Throwable ignored) {}
         }, "valtrin-shutdown"));
 
         Thread.currentThread().join();

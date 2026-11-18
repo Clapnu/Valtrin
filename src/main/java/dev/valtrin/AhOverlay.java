@@ -204,7 +204,7 @@ final class AhOverlay {
             }
             if (info == null || info.buyItNow() <= 0 || info.tier() == null) continue;
 
-            Market.Estimate est = Market.estimate(info.data(), info.buyItNow());
+            Market.Estimate est = Market.fresh() ? Market.estimate(info.data(), info.buyItNow()) : null;
             int color = 0;
             if (own) {
                 if (info.activeListing() && Market.isOvercut(est, info.buyItNow())) color = RED;
@@ -242,9 +242,15 @@ final class AhOverlay {
         if (Pricing.isBazaar(d.id())) return; // bazaar items: nothing to add
         long price = info.buyItNow();
 
-        long[] raw = Market.raw(d);
-        Market.Estimate est = Pricing.ready() ? Market.estimate(d, price) : null;
-        if (raw == null && est == null) return;
+        boolean fresh = Market.fresh();
+        long[] raw = fresh ? Market.raw(d) : null;
+        Market.Estimate est = fresh && Pricing.ready() ? Market.estimate(d, price) : null;
+        if (raw == null && est == null) {
+            if (!fresh && ValtrinMod.serverConnected()) {
+                lines.add(V.t("✦ ", V.GOLD).append(V.t("Price tooltips are loading market data...", V.GREY)));
+            }
+            return;
+        }
         boolean loading = d.tier() != null && OwnModel.loading(d);
 
         lines.add(Component.empty().append(V.t("✦ ", V.GOLD)).append(V.bold("Valtrin", V.PURPLE)));

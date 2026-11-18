@@ -52,6 +52,12 @@ public class ValtrinMod implements ClientModInitializer {
     public static FlipEngine engine;
     static ServerLink link;
 
+    /** True while the Valtrin server is delivering the alerts (this computer is then not searching Hypixel itself). */
+    static boolean serverConnected() {
+        ServerLink l = link;
+        return l != null && l.connected();
+    }
+
     /** The "open next flip" key. Change it in Options > Controls > Valtrin. */
     private static KeyMapping nextFlipKey;
     private static KeyMapping settingsKey;
@@ -149,8 +155,10 @@ public class ValtrinMod implements ClientModInitializer {
         volume.load();
         ModAlertSink alertSink = new ModAlertSink(ALERTS);
         engine = new FlipEngine(volume, alertSink);
-        link = new ServerLink(alertSink);
+        // The server link gets its own sink that never drops anything; the local engine's sink drops its alerts while the server delivers them.
+        link = new ServerLink(new ModAlertSink(ALERTS));
         alertSink.setLink(link);
+        Market.serverMode = ValtrinMod::serverConnected;
         engine.start();
         link.start();
 
@@ -174,6 +182,14 @@ public class ValtrinMod implements ClientModInitializer {
         ClientReceiveMessageEvents.GAME.register((message, overlay) -> {
             if (overlay || !onHypixel) return; // other servers can't feed the profit stats
             try {
+                java.util.List<String> texts = new java.util.ArrayList<>();
+                java.util.List<Integer> rgbs = new java.util.ArrayList<>();
+                message.visit((style, text) -> {
+                    texts.add(text);
+                    rgbs.add(style.getColor() == null ? null : style.getColor().getValue());
+                    return java.util.Optional.empty();
+                }, net.minecraft.network.chat.Style.EMPTY);
+                FlipStats.noteColors(texts, rgbs);
                 FlipStats.onChat(message.getString(), System.currentTimeMillis());
             } catch (Throwable ignored) {
                 // stats must never affect the game

@@ -20,6 +20,8 @@ final class ServerSettings {
     final int maxFailsPerMinute;
     /** Public https address of this server, e.g. https://api.valtrin.app (needed for "Sign in with Discord"). */
     final String publicUrl;
+    /** The one website address allowed to read /v1/flips from a browser (empty = no browser access). */
+    final String siteOrigin;
     final String discordClientId;
     /** Optional: only members of this Discord server may get a key. */
     final String discordGuildId;
@@ -34,6 +36,7 @@ final class ServerSettings {
     final String contactEmail;
     /** The /redeem page (invite codes) is available. */
     final boolean redeemEnabled;
+    final boolean discordBotOnline;
     /** Most keys one client address can make through /redeem per day. */
     final int redeemPerAddressPerDay;
 
@@ -45,6 +48,8 @@ final class ServerSettings {
         maxSessions = intIn(p, "maxSessions", 300, 1, 5000);
         maxFailsPerMinute = intIn(p, "maxFailsPerMinute", 20, 1, 10_000);
         publicUrl = p.getProperty("publicUrl", "").trim().replaceAll("/+$", "");
+        String so = p.getProperty("siteOrigin", "https://valtrin.app").trim().replaceAll("/+$", "");
+        siteOrigin = so.matches("https://[a-z0-9.-]{3,100}") ? so : "";
         discordClientId = p.getProperty("discordClientId", "").trim();
         discordGuildId = p.getProperty("discordGuildId", "").trim();
         discordRoleGuildId = p.getProperty("discordRoleGuildId", "").trim();
@@ -55,6 +60,7 @@ final class ServerSettings {
         String ce = p.getProperty("contactEmail", "").trim();
         contactEmail = ce.matches("[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9.-]{1,100}\\.[A-Za-z]{2,}") ? ce : "";
         redeemEnabled = Boolean.parseBoolean(p.getProperty("redeemEnabled", "true").trim());
+        discordBotOnline = Boolean.parseBoolean(p.getProperty("discordBotOnline", "true").trim());
         redeemPerAddressPerDay = intIn(p, "redeemPerAddressPerDay", 5, 1, 1000);
     }
 
@@ -98,6 +104,8 @@ final class ServerSettings {
                         publicUrl=
                         # Shown on the public project page at the server address (optional).
                         contactEmail=
+                        # The one website address allowed to read /v1/flips from a browser. Empty turns browser access off.
+                        siteOrigin=https://valtrin.app
                         discordClientId=
                         discordGuildId=
                         # Optional: give people in your Discord server a Free Plan / Premium Plan role that matches their key.
@@ -105,6 +113,8 @@ final class ServerSettings {
                         discordRoleGuildId=
                         discordFreeRoleId=
                         discordPremiumRoleId=
+                        # Show the bot as online in Discord (uses the same bot token file). Needs no extra permissions.
+                        discordBotOnline=true
                         discordMinAccountDays=7
                         redeemPerAddressPerDay=5
                         """);

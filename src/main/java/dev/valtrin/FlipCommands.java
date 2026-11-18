@@ -106,6 +106,10 @@ final class FlipCommands {
                             reply(c.getSource(), "Profit history cleared.", ChatFormatting.GREEN);
                             return 1;
                         }))
+                        .then(literal("share")
+                                .executes(c -> shareStatus(c.getSource()))
+                                .then(literal("on").executes(c -> shareSet(c.getSource(), true)))
+                                .then(literal("off").executes(c -> shareSet(c.getSource(), false))))
                         .then(argument("days", StringArgumentType.word())
                                 .suggests((ctx, b) -> {
                                     for (String x : new String[]{"1", "3", "7", "14", "all"}) b.suggest(x);
@@ -283,6 +287,22 @@ final class FlipCommands {
     }
 
     // ---------------------------------------------------------------- output
+
+    /** /flip profit share: whether completed flips are sent to your Valtrin server for the website's Flip Stats. */
+    private static int shareStatus(FabricClientCommandSource src) {
+        boolean on = FlipConfig.INSTANCE.reportStats;
+        reply(src, "Sharing completed flips with your Valtrin server: " + (on ? "ON" : "OFF") + ".", on ? ChatFormatting.GREEN : ChatFormatting.GRAY);
+        reply(src, "When on, each flip you complete sends its time, item name, the item's rarity, coins paid and coins received to the server address you set. Nothing else. Premium only. Use /flip profit share on or off.", ChatFormatting.GRAY);
+        return 1;
+    }
+
+    private static int shareSet(FabricClientCommandSource src, boolean on) {
+        FlipConfig.INSTANCE.reportStats = on;
+        FlipConfig.save();
+        reply(src, on ? "Sharing is ON. Flips you complete from now on are sent to your Valtrin server (never older ones)."
+                : "Sharing is OFF. Nothing is sent. Delete what the server holds on the Flip Stats page.", on ? ChatFormatting.GREEN : ChatFormatting.GRAY);
+        return 1;
+    }
 
     /** /flip profit [1-14|all]: profit from your own Auction House flips (read from chat), after auction fees. */
     private static int profit(FabricClientCommandSource src, String arg) {

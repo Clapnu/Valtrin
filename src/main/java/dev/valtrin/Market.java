@@ -24,6 +24,15 @@ final class Market {
     /** item id -> cheapest BIN of that id (any rarity/stars), used to price scrolls and similar. */
     static volatile Map<String, Long> lowestIds = Map.of();
     static volatile long updatedAt = 0;
+    /** Market data older than this is not shown: after a few minutes without a refresh (for example while the Valtrin server delivers the alerts and this computer is not searching Hypixel) old prices would mislead. */
+    static final long FRESH_MS = 5 * 60_000L;
+
+    /** Set by the mod: true while the Valtrin server delivers the alerts. The server program itself never sets it (always false). */
+    static volatile java.util.function.BooleanSupplier serverMode = () -> false;
+
+    static boolean fresh() {
+        return updatedAt > 0 && Clock.now() - updatedAt < FRESH_MS;
+    }
     static volatile VolumeTracker volume;
 
     /** All numbers behind one valuation. A value of -1 means "not available". */

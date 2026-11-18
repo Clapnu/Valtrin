@@ -2,6 +2,20 @@
 
 Each release in short. Full notes are on the Modrinth page.
 
+## 23.9.7
+
+- Server: new Discord commands /auctions (a player's auction house as one picture: listings with rarity colours and stars, recent sales stamped SOLD and shown first, identical items grouped, sort and page buttons, optional profile), /link, /unlink and /notify (a DM when one of your auctions sells, off until you turn it on). Built only from Hypixel's public auction data; no API key. Mod unchanged
+- Fixed: price tooltips and the auction-house colours no longer stop while you are connected to the Valtrin server. This computer keeps reading prices; the alerts themselves still come only from the server
+- Item rarity is now sent with Flip Stats (optional, same opt-in), so the website can colour item names
+- Server: new /valtrin and /status Discord slash commands (links, and whether the server is up). Only the person who types them sees the answer
+- New and OFF by default: Flip Stats sharing. With /flip profit share on, each flip you complete (time, item, coins paid, coins received) is sent to your Valtrin server and shown on the website's Flip Stats page. Premium keys only, never sends flips from before you turned it on, and the page has a button that deletes it all. /flip profit share off stops it
+- Server: shows the Discord bot as online, using the same bot token file as the plan roles (setting discordBotOnline, on by default)
+- Server: new Craft Flips feed for the website (/v1/craft, premium keys only). It finds items that cost less to craft than they sell for, using recipes from the NotEnoughUpdates item repository and prices the server already has. It never buys or crafts anything
+- Server: new read-only /v1/flips feed for the Valtrin website. It needs your key, respects your plan's delay and history window, leaves out seller names, and only the website's own address (siteOrigin setting) may read it from a browser
+- Server: after a restart, an account that is on the free plan now also loses a leftover Premium Plan role in Discord
+- Server: signing in with Discord again no longer turns a premium key into a free one. The new key keeps the plan the account already had
+- While the Valtrin server delivers your alerts, this computer no longer searches Hypixel, so its price data stops updating. Old prices are now hidden instead of shown: slot colours, price tooltips and the Create Auction suggestions pause (with a short note) instead of showing out-of-date numbers
+
 ## 23.9.6
 
 - The "Aggressive" filter preset is now called "Risky", because it lowers every bar (profit, margin, sales per day, confidence) and so shows more alerts that are smaller, slower or less certain. `/flip preset aggressive` still works
@@ -97,4 +111,4 @@ Each release in short. Full notes are on the Modrinth page.
 - Right-click on an alert works when the seller name wasn't cached; fast-check flips are no longer lost on errors; incomplete downloads no longer create false "new" listings; rate-limit pauses are capped.
 
 ## Earlier
-Versions 5 to 23.4 and the SkyFlipper / SkyCofl lines before them: faster polling, the own sales model, confidence ratings, the purple-and-gold alert design and the profit report.
+Versions 5 to 23.4 and the earlier SkyFlipper line: faster polling, the own sales model, confidence ratings, the purple-and-gold alert design and the profit report.

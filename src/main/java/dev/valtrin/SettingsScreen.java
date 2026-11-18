@@ -219,7 +219,7 @@ public final class SettingsScreen extends Screen {
                     c().sharedUrl = u.equalsIgnoreCase("off") ? "" : u;
                     return true;
                 }));
-                r.add(toggle("Alerts from the server", "Get flip alerts from the Valtrin server (needs address and key). While connected, this computer stops searching Hypixel itself.", () -> c().useServerAlerts, v -> c().useServerAlerts = v));
+                r.add(toggle("Alerts from the server", "Get flip alerts from the Valtrin server (needs address and key). While connected, alerts come from the server; this computer still reads prices for tooltips.", () -> c().useServerAlerts, v -> c().useServerAlerts = v));
                 Row key = field("Server key", "The key for the server above.", () -> c().sharedKey.isEmpty() ? "" : "••••••••", t -> { c().sharedKey = t.trim(); return true; });
                 key.masked = true;
                 r.add(key);

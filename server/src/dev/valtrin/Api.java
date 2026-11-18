@@ -9,7 +9,9 @@ import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
@@ -27,9 +29,16 @@ final class Api {
     private final ServerSettings cfg;
     private final KeyStore keys;
     private final Hub hub;
+    private volatile CraftFlips crafts;
+    private volatile StatsStore statsStore;
+
+    void setStats(StatsStore s) { this.statsStore = s; }
+
+    void setCrafts(CraftFlips c) { this.crafts = c; }
     private final InviteStore invites;
     private final DiscordLogin discord;
     private final DiscordRoles roles;
+    private final DiscordGateway gateway;
     private final HttpServer server;
 
     /** ip -> {window start ms, failures in window}. */
@@ -46,6 +55,19 @@ final class Api {
         this.hub = hub;
         this.invites = invites;
         this.roles = new DiscordRoles(cfg, keys, configDir);
+        this.gateway = new DiscordGateway(cfg, configDir);
+        final long startedAt = System.currentTimeMillis();
+        DiscordCommands dcmds = new DiscordCommands(cfg, gateway.token(), () -> "**Valtrin server**: online\n"
+                + "Up for " + ((System.currentTimeMillis() - startedAt) / 3_600_000L) + " h\n"
+                + "Flips found in the last hour: " + hub.countSince(3_600_000L) + "\n"
+                + "Free plan alert delay: " + (cfg.freeDelayMs / 1000L) + " s");
+        AuctionIndex aucIndex = new AuctionIndex();
+        AuctionFeed.L = aucIndex;
+        AuctionCommands aucCmds = new AuctionCommands(cfg, gateway.token(), aucIndex, new NotifyStore(configDir.resolve("discord-links.tsv")),
+                AuctionCommands.mojangNames(), DiscordCommands.API, "https://api.mojang.com");
+        dcmds.useAuctions(aucCmds);
+        this.gateway.useCommands(dcmds);
+        Thread.startVirtualThread(aucCmds::checkImage);
         this.discord = new DiscordLogin(cfg, keys, this, configDir);
         server = HttpServer.create(new InetSocketAddress(cfg.bind, cfg.port), 128);
         server.setExecutor(Executors.newVirtualThreadPerTaskExecutor());
@@ -63,12 +85,14 @@ final class Api {
 
     void start() {
         roles.start();
+        gateway.start();
         server.start();
         Log.LOGGER.info("Listening on {}:{}", cfg.bind, cfg.port);
     }
 
     void stop() {
         roles.stop();
+        gateway.stop();
         server.stop(1);
     }
 
@@ -98,7 +122,13 @@ final class Api {
                 else discord.callback(ex);
                 return;
             }
-            if (!"GET".equals(ex.getRequestMethod())) {
+            if ("OPTIONS".equals(ex.getRequestMethod()) && ("/v1/flips".equals(first) || "/v1/craft".equals(first) || "/v1/stats".equals(first))) {
+                preflight(ex);
+                return;
+            }
+            boolean statsPath = "/v1/stats".equals(first);
+            String method = ex.getRequestMethod();
+            if (!"GET".equals(method) && !(statsPath && ("POST".equals(method) || "DELETE".equals(method)))) {
                 reply(ex, 405, "method");
                 return;
             }
@@ -118,6 +148,27 @@ final class Api {
             switch (path) {
                 case "/ping" -> reply(ex, 200, "ok");
                 case "/v1/stream" -> stream(ex, entry, ip);
+                case "/v1/flips" -> {
+                    if (!takeToken(entry.hash())) {
+                        reply(ex, 429, "slow down");
+                        return;
+                    }
+                    flips(ex, entry);
+                }
+                case "/v1/craft" -> {
+                    if (!takeToken(entry.hash())) {
+                        reply(ex, 429, "slow down");
+                        return;
+                    }
+                    craft(ex, entry);
+                }
+                case "/v1/stats" -> {
+                    if (!takeToken(entry.hash())) {
+                        reply(ex, 429, "slow down");
+                        return;
+                    }
+                    stats(ex, entry);
+                }
                 case "/sales", "/coverage" -> {
                     if (!takeToken(entry.hash())) {
                         reply(ex, 429, "slow down");
@@ -134,6 +185,134 @@ final class Api {
                 ex.close();
             }
         }
+    }
+
+    // ------------------------------------------------------------------ website feed
+
+    /** True when the request comes from the one website allowed to read the feed from a browser. */
+    private boolean allowedOrigin(HttpExchange ex) {
+        String origin = ex.getRequestHeaders().getFirst("Origin");
+        return !cfg.siteOrigin.isEmpty() && cfg.siteOrigin.equals(origin);
+    }
+
+    private void corsHeaders(HttpExchange ex) {
+        var h = ex.getResponseHeaders();
+        h.set("Access-Control-Allow-Origin", cfg.siteOrigin);
+        h.set("Vary", "Origin");
+    }
+
+    private void preflight(HttpExchange ex) throws IOException {
+        if (!allowedOrigin(ex)) {
+            reply(ex, 404, "not found");
+            return;
+        }
+        corsHeaders(ex);
+        var h = ex.getResponseHeaders();
+        h.set("Access-Control-Allow-Methods", "GET, DELETE");
+        h.set("Access-Control-Allow-Headers", "X-Key");
+        h.set("Access-Control-Max-Age", "600");
+        ex.sendResponseHeaders(204, -1);
+        ex.close();
+    }
+
+    /** GET /v1/flips: recent flips for the website, held back by the key's own delay, no seller names. */
+    private void flips(HttpExchange ex, KeyStore.Entry entry) throws IOException {
+        byte[] data = hub.recentJson(entry.tier(), System.currentTimeMillis(), 100).getBytes(StandardCharsets.UTF_8);
+        var h = ex.getResponseHeaders();
+        if (allowedOrigin(ex)) corsHeaders(ex);
+        h.set("Content-Type", "application/json; charset=utf-8");
+        h.set("Cache-Control", "no-store");
+        h.set("X-Content-Type-Options", "nosniff");
+        ex.sendResponseHeaders(200, data.length);
+        try (OutputStream o = ex.getResponseBody()) {
+            o.write(data);
+        }
+        ex.close();
+    }
+
+    /** GET /v1/craft: crafts that currently look profitable. Premium keys only (and only while premium is switched on). */
+    private void craft(HttpExchange ex, KeyStore.Entry entry) throws IOException {
+        boolean allowed = entry.tier() == KeyStore.Tier.PREMIUM && cfg.premiumEnabled;
+        String body = allowed ? (crafts == null ? "{\"crafts\":[]}" : crafts.json(System.currentTimeMillis())) : "{\"error\":\"premium\"}";
+        byte[] data = body.getBytes(StandardCharsets.UTF_8);
+        var h = ex.getResponseHeaders();
+        if (allowedOrigin(ex)) corsHeaders(ex);
+        h.set("Content-Type", "application/json; charset=utf-8");
+        h.set("Cache-Control", "no-store");
+        h.set("X-Content-Type-Options", "nosniff");
+        ex.sendResponseHeaders(allowed ? 200 : 403, data.length);
+        try (OutputStream o = ex.getResponseBody()) {
+            o.write(data);
+        }
+        ex.close();
+    }
+
+    /**
+     * /v1/stats (premium keys only): POST takes completed flips from the player's own mod (opt-in in the mod), GET gives
+     * them back for the website, DELETE removes everything stored for the account.
+     */
+    private void stats(HttpExchange ex, KeyStore.Entry entry) throws IOException {
+        boolean allowed = entry.tier() == KeyStore.Tier.PREMIUM && cfg.premiumEnabled && statsStore != null;
+        String m = ex.getRequestMethod();
+        if (!allowed) {
+            ex.getRequestBody().readNBytes(1);
+            json(ex, 403, "{\"error\":\"premium\"}");
+            return;
+        }
+        long now = System.currentTimeMillis();
+        String label = entry.label();
+        if ("POST".equals(m)) {
+            byte[] raw = ex.getRequestBody().readNBytes(20_001);
+            if (raw.length > 20_000) { json(ex, 413, "{\"error\":\"too big\"}"); return; }
+            List<StatsStore.Flip> in = new ArrayList<>();
+            try {
+                com.google.gson.JsonElement e = com.google.gson.JsonParser.parseString(new String(raw, StandardCharsets.UTF_8));
+                if (!e.isJsonArray() || e.getAsJsonArray().size() > StatsStore.MAX_BATCH) throw new IllegalArgumentException("shape");
+                for (com.google.gson.JsonElement x : e.getAsJsonArray()) {
+                    com.google.gson.JsonObject o = x.getAsJsonObject();
+                    StatsStore.Flip f = StatsStore.clean(o.get("ts").getAsLong(), o.get("item").getAsString(),
+                            o.get("cost").getAsLong(), o.get("got").getAsLong(),
+                            o.has("rarity") && o.get("rarity").isJsonPrimitive() ? o.get("rarity").getAsString() : null, now);
+                    if (f != null) in.add(f);
+                }
+            } catch (RuntimeException bad) {
+                json(ex, 400, "{\"error\":\"bad request\"}");
+                return;
+            }
+            int n = statsStore.add(label, in, now);
+            json(ex, 200, "{\"stored\":" + n + "}");
+        } else if ("DELETE".equals(m)) {
+            json(ex, 200, "{\"deleted\":" + statsStore.delete(label) + "}");
+        } else {
+            List<StatsStore.Flip> l = statsStore.recent(label, now, 36_500, StatsStore.MAX_LINES);
+            StringBuilder sb = new StringBuilder("{\"now\":" + now + ",\"flips\":[");
+            for (int i = 0; i < l.size(); i++) {
+                StatsStore.Flip f = l.get(i);
+                if (i > 0) sb.append(',');
+                com.google.gson.JsonObject o = new com.google.gson.JsonObject();
+                o.addProperty("ts", f.ts());
+                o.addProperty("item", f.item());
+                o.addProperty("cost", f.cost());
+                o.addProperty("got", f.got());
+                if (!f.rarity().isEmpty()) o.addProperty("rarity", f.rarity());
+                sb.append(o);
+            }
+            json(ex, 200, sb.append("]}").toString());
+        }
+    }
+
+    private void json(HttpExchange ex, int code, String body) throws IOException {
+        byte[] data = body.getBytes(StandardCharsets.UTF_8);
+        var h = ex.getResponseHeaders();
+        if (allowedOrigin(ex)) corsHeaders(ex);
+        h.set("Content-Type", "application/json; charset=utf-8");
+        h.set("Cache-Control", "no-store");
+        h.set("X-Content-Type-Options", "nosniff");
+        ex.sendResponseHeaders(code, data.length);
+        try (OutputStream o = ex.getResponseBody()) {
+            o.write(data);
+        }
+        ex.close();
     }
 
     // ------------------------------------------------------------------ invite codes

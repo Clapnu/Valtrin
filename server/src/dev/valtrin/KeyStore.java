@@ -123,6 +123,30 @@ final class KeyStore {
         return key;
     }
 
+    /**
+     * Replaces the key(s) with this label by one new key and returns it. The new key keeps the plan the label already had
+     * (PREMIUM if any old key with that label was premium), so a customer who signs in again never loses what they paid for;
+     * a label with no key yet gets {@code defaultTier}. Revoking the old key and making the new one is one step under the file lock.
+     */
+    synchronized String replace(String label, Tier defaultTier) throws IOException {
+        return withFileLock(file, () -> {
+            if (label == null || !LABEL.matcher(label).matches()) throw new IllegalArgumentException("label: 1-40 letters, digits, space . _ @ -");
+            loadedMtime = Long.MIN_VALUE;
+            reloadIfChanged();
+            Tier tier = defaultTier;
+            Map<String, Entry> next = new HashMap<>(byHash);
+            for (Entry e : byHash.values()) if (e.label.equalsIgnoreCase(label) && e.tier == Tier.PREMIUM) tier = Tier.PREMIUM;
+            next.values().removeIf(e -> e.label.equalsIgnoreCase(label));
+            byte[] raw = new byte[32];
+            RANDOM.nextBytes(raw);
+            String key = "vk_" + Base64.getUrlEncoder().withoutPadding().encodeToString(raw);
+            Entry made = new Entry(hash(key), tier, label, System.currentTimeMillis());
+            next.put(made.hash, made);
+            write(next);
+            return key;
+        });
+    }
+
     /** Removes every key with this label (case-insensitive). Returns how many were removed. */
     synchronized int revoke(String label) throws IOException {
         return withFileLock(file, () -> revokeLocked(label));

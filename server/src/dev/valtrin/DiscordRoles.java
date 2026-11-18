@@ -48,6 +48,7 @@ final class DiscordRoles {
     private final ConcurrentHashMap<String, Applied> applied = new ConcurrentHashMap<>();
     private final AtomicBoolean queued = new AtomicBoolean();
     private ScheduledExecutorService ex;
+    private volatile boolean warnedRole;
 
     DiscordRoles(ServerSettings cfg, KeyStore keys, Path configDir) {
         this.cfg = cfg;
@@ -130,7 +131,7 @@ final class DiscordRoles {
             int st = call("PUT", id, premium ? cfg.discordPremiumRoleId : cfg.discordFreeRoleId, calls);
             if (st == 204) {
                 // swap: the other plan role goes away when the plan changed (or when making a premium member)
-                if (!cfg.discordPremiumRoleId.isEmpty() && (premium || (prev != null && prev.premium))) {
+                if (!cfg.discordPremiumRoleId.isEmpty() && (premium || prev == null || prev.premium)) { // prev == null: after a restart we do not know what the member had
                     call("DELETE", id, premium ? cfg.discordFreeRoleId : cfg.discordPremiumRoleId, calls);
                 }
                 if (prev == null || prev.premium != premium || !prev.member) {
@@ -142,7 +143,7 @@ final class DiscordRoles {
             } else if (st == 403) {
                 Log.LOGGER.warn("Discord refused the role change: give the bot Manage Roles and put its role above the plan roles");
                 return;
-            } else if (st == 429 || st < 0) {
+            } else if (st == 429 || st < 0 || st == 400) {
                 return; // slow down or Discord is unreachable: try again next time
             }
         }
@@ -169,7 +170,19 @@ final class DiscordRoles {
                     .header("Authorization", "Bot " + token).header("User-Agent", "Valtrin (https://valtrin.app, 1)")
                     .header("X-Audit-Log-Reason", "Valtrin plan role");
             HttpRequest req = "PUT".equals(method) ? b.PUT(HttpRequest.BodyPublishers.noBody()).build() : b.DELETE().build();
-            return http.send(req, HttpResponse.BodyHandlers.discarding()).statusCode();
+            HttpResponse<java.io.InputStream> resp = http.send(req, HttpResponse.BodyHandlers.ofInputStream());
+            int code = resp.statusCode();
+            String body = "";
+            try (java.io.InputStream in = resp.body()) {
+                body = new String(in.readNBytes(2000), StandardCharsets.UTF_8); // never read more than 2 KB of an answer
+            }
+            // Discord says "Unknown Role" (10011) in the body: that is a settings mistake, not a missing member
+            if (code == 404 && body.contains("10011")) {
+                if (!warnedRole) Log.LOGGER.warn("Discord says a plan role id does not exist: check discordFreeRoleId and discordPremiumRoleId");
+                warnedRole = true;
+                return 400;
+            }
+            return code;
         } catch (java.io.IOException | RuntimeException e) {
             Log.LOGGER.warn("Could not reach Discord to change a role: {}", e.toString());
             return -1;

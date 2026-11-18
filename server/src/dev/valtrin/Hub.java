@@ -1,7 +1,11 @@
 // Copyright (c) 2026 Valtrin. All rights reserved. See LICENSE.
 package dev.valtrin;
 
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
+import java.util.Iterator;
 import java.util.List;
+import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
@@ -42,6 +46,13 @@ final class Hub implements AlertSink {
         t.setDaemon(true);
         return t;
     });
+    /** A recent flip as the website may show it: no seller name or seller id. */
+    private record Recent(long at, String name, String tier, String uuid, long buy, long sell, long profit, double margin, double volume, String conf) {}
+
+    private static final int MAX_RECENT = 4000;
+    private static final long KEEP_MS = 24L * 3_600_000L;
+    private static final long FREE_HISTORY_MS = 30L * 60_000L;
+    private final ConcurrentLinkedDeque<Recent> recent = new ConcurrentLinkedDeque<>();
     final AtomicLong flips = new AtomicLong(), notices = new AtomicLong(), sent = new AtomicLong(), dropped = new AtomicLong();
 
     Hub(ServerSettings cfg) {
@@ -50,6 +61,60 @@ final class Hub implements AlertSink {
 
     long delayFor(KeyStore.Tier tier) {
         return tier == KeyStore.Tier.PREMIUM && cfg.premiumEnabled ? 0 : cfg.freeDelayMs;
+    }
+
+    /** How far back a key may look: 30 minutes for free keys, 24 hours for premium once premium is enabled. */
+    long historyMsFor(KeyStore.Tier tier) {
+        return tier == KeyStore.Tier.PREMIUM && cfg.premiumEnabled ? KEEP_MS : FREE_HISTORY_MS;
+    }
+
+    /** How many flips were found in the last {@code ms} milliseconds (a count only, no names). */
+    int countSince(long ms) {
+        long from = System.currentTimeMillis() - ms;
+        int n = 0;
+        for (Recent r : recent) if (r.at() >= from) n++;
+        return n;
+    }
+
+    private void remember(FlipAlert f, long at) {
+        recent.addLast(new Recent(at, f.name(), f.tier(), f.uuid(), f.buy(), f.sell(), f.profit(), f.margin(), f.volume(), f.conf()));
+        long cutoff = System.currentTimeMillis() - KEEP_MS;
+        Recent first;
+        while ((first = recent.peekFirst()) != null && (recent.size() > MAX_RECENT || first.at() < cutoff)) recent.pollFirst();
+    }
+
+    /**
+     * The flips a key may see right now, newest first, as JSON for the website: each flip is held back by the key's own
+     * delay (so the website never gives a free key anything sooner than the mod gets it) and only goes back as far as
+     * the key's history window. Seller names are never included.
+     */
+    String recentJson(KeyStore.Tier tier, long now, int limit) {
+        long delay = delayFor(tier), window = historyMsFor(tier);
+        JsonArray arr = new JsonArray();
+        Iterator<Recent> it = recent.descendingIterator();
+        while (it.hasNext() && arr.size() < limit) {
+            Recent r = it.next();
+            if (r.at() + delay > now) continue;
+            if (r.at() < now - window) continue; // not break: flips are not guaranteed to be stored in time order
+            JsonObject o = new JsonObject();
+            o.addProperty("at", r.at());
+            o.addProperty("name", r.name());
+            o.addProperty("tier", r.tier());
+            o.addProperty("uuid", r.uuid());
+            o.addProperty("buy", r.buy());
+            o.addProperty("sell", r.sell());
+            o.addProperty("profit", r.profit());
+            o.addProperty("margin", r.margin());
+            o.addProperty("volume", r.volume());
+            if (r.conf() != null) o.addProperty("conf", r.conf());
+            arr.add(o);
+        }
+        JsonObject out = new JsonObject();
+        out.addProperty("now", now);
+        out.addProperty("delayMs", delay);
+        out.addProperty("historyMs", window);
+        out.add("flips", arr);
+        return out.toString();
     }
 
     int sessionCount() {
@@ -101,6 +166,7 @@ final class Hub implements AlertSink {
     public void flip(FlipAlert f, long at, boolean real) {
         if (!real) return;
         flips.incrementAndGet();
+        remember(f, at);
         deliver("flip", Wire.encodeFlip(f, at), true);
     }
 

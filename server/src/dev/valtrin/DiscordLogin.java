@@ -173,8 +173,7 @@ final class DiscordLogin {
                 }
                 long[] last = known.get(discordId);
                 if (last != null && now - last[0] < REGENERATE_MIN_MS) return null;
-                keys.revoke(label);
-                String k = keys.add(KeyStore.Tier.FREE, label);
+                String k = keys.replace(label, KeyStore.Tier.FREE); // keeps a premium plan if the account has one
                 known.put(discordId, new long[]{now});
                 StringBuilder sb = new StringBuilder();
                 for (var e : known.entrySet()) sb.append(e.getKey()).append('\t').append(e.getValue()[0]).append('\n');

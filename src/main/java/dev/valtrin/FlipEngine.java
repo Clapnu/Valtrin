@@ -765,6 +765,7 @@ final class FlipEngine {
         long fetchStart = System.currentTimeMillis();
 
         Map<String, Auction> all = new LinkedHashMap<>();
+        AuctionFeed.begin();
         parsePage(p.json(), all);
         int got = 1;
         int kp = knownPages;
@@ -831,6 +832,7 @@ final class FlipEngine {
         lastFetchMs = System.currentTimeMillis() - fetchStart;
         long procStart = System.currentTimeMillis();
         process(lu, all);
+        AuctionFeed.done(lu);
         lastProcessMs = System.currentTimeMillis() - procStart;
         lastLagMs = System.currentTimeMillis() + HypixelApi.clockOffsetMs - lu;
     }
@@ -840,6 +842,7 @@ final class FlipEngine {
         if (arr == null) return;
         for (JsonElement el : arr) {
             JsonObject o = el.getAsJsonObject();
+            AuctionFeed.listing(o);
             if (!o.has("bin") || !o.get("bin").getAsBoolean()) continue;
             if (o.has("claimed") && o.get("claimed").getAsBoolean()) continue;
             String uuid = o.get("uuid").getAsString();
@@ -867,6 +870,7 @@ final class FlipEngine {
             ItemData d = parseItem(a);
             if (d == ItemData.NONE) continue;
             entries.add(new Entry(a, d));
+            AuctionFeed.stars(a.uuid(), d.stars());
             rows.add(new Market.Row(a.price(), d));
         }
         cache.keySet().retainAll(all.keySet());
@@ -1198,6 +1202,7 @@ final class FlipEngine {
                 String id = a.get("auction_id").getAsString();
                 ids.add(id);
                 if (lastEndedIds.contains(id)) continue;
+                AuctionFeed.sale(a);
                 if (!a.has("bin") || !a.get("bin").getAsBoolean()) continue;
 
                 ItemData d = ItemKeys.parse(HypixelApi.itemBytes(a.get("item_bytes")));

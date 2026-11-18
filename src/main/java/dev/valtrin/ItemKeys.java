@@ -55,6 +55,25 @@ final class ItemKeys {
         }
     }
 
+    /** The item's display name without colour codes (stars included, e.g. "Hyperion ✪✪✪✪✪➌"), or null. */
+    static String displayName(String base64) {
+        if (base64 == null || base64.isEmpty() || base64.length() > MAX_BYTES * 2) return null;
+        try {
+            byte[] raw = Base64.getDecoder().decode(base64);
+            try (DataInputStream in = new DataInputStream(new LimitedInputStream(new GZIPInputStream(new ByteArrayInputStream(raw)), MAX_BYTES))) {
+                if (in.readByte() != 10) return null;
+                in.readUTF();
+                Map<String, Object> root = readCompound(in, 0);
+                if (!(root.get("i") instanceof List<?> list) || list.isEmpty()) return null;
+                Map<String, Object> display = asMap(asMap(asMap(list.get(0)).get("tag")).get("display"));
+                String n = asString(display.get("Name")).replaceAll("§.", "").strip();
+                return n.isEmpty() || n.length() > 120 ? null : n;
+            }
+        } catch (Throwable e) {
+            return null;
+        }
+    }
+
     /** Parses an uncompressed NBT compound that is already the item's extra attributes. */
     static ItemData parseUncompressed(byte[] raw, String plainName) {
         if (raw == null || raw.length > MAX_BYTES) return ItemData.NONE;

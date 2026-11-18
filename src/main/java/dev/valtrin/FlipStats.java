@@ -56,8 +56,48 @@ public final class FlipStats {
     private static final List<Flip> flips = new ArrayList<>();
     private static final Map<String, ArrayDeque<long[]>> open = new HashMap<>();
     private static final Map<String, String> displayNames = new HashMap<>();
+    /** Item key to rarity name (from the colour of the item's name in the chat line). Only kept while the game runs. */
+    private static final Map<String, String> rarities = new HashMap<>();
+
+    /** The rarity that goes with a chat colour (Hypixel's rarity colours), or null if it is not one of them. */
+    static String rarityForRgb(int rgb) {
+        switch (rgb & 0xFFFFFF) {
+            case 0xFFFFFF: return "COMMON";
+            case 0x55FF55: return "UNCOMMON";
+            case 0x5555FF: return "RARE";
+            case 0xAA00AA: return "EPIC";
+            case 0xFFAA00: return "LEGENDARY";
+            case 0xFF55FF: return "MYTHIC";
+            case 0x55FFFF: return "DIVINE";
+            case 0xFF5555: return "SPECIAL";
+            case 0xAA0000: return "VERY_SPECIAL";
+            default: return null;
+        }
+    }
+
+    /**
+     * Called with the pieces of a chat line (text and colour) just before {@link #onChat}. For a purchase line it
+     * remembers the colour of the piece that holds the item name, which is the item's rarity.
+     */
+    public static synchronized void noteColors(java.util.List<String> texts, java.util.List<Integer> rgbs) {
+        try {
+            Matcher m = BOUGHT.matcher(String.join("", texts).strip());
+            if (!m.find()) return;
+            String name = m.group(1).strip();
+            for (int i = 0; i < texts.size(); i++) {
+                String t = texts.get(i).strip();
+                Integer c = rgbs.get(i);
+                if (c == null || t.length() < 3 || !name.contains(t)) continue;
+                String r = rarityForRgb(c);
+                if (r != null) { rarities.put(key(m.group(1)), r); return; }
+            }
+        } catch (RuntimeException ignored) {
+            // a colour hint is a bonus only
+        }
+    }
     private static int unmatchedSales = 0;
     private static int unmatchedLogged = 0;
+    private static boolean loading = false;
 
     public static synchronized void init(Path dataDir) {
         file = dataDir.resolve("flip-stats.tsv");
@@ -65,6 +105,7 @@ public final class FlipStats {
         flips.clear();
         open.clear();
         unmatchedSales = 0;
+        loading = true; // history read back from disk is never sent anywhere
         try {
             if (Files.exists(file)) {
                 for (String l : Files.readAllLines(file)) {
@@ -78,6 +119,8 @@ public final class FlipStats {
             }
         } catch (IOException | RuntimeException e) {
             // a damaged stats file only loses history; never break the game
+        } finally {
+            loading = false;
         }
     }
 
@@ -207,6 +250,7 @@ public final class FlipStats {
         }
         long[] p = q.pollFirst();
         flips.add(new Flip(ts, displayNames.getOrDefault(k, item), p[1], got));
+        if (!loading) StatsReport.queue(ts, displayNames.getOrDefault(k, item), p[1], got, rarities.get(k));
     }
 
     private static void append(String type, long ts, String item, long amount) {

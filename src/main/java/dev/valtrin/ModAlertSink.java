@@ -13,11 +13,13 @@ final class ModAlertSink implements AlertSink {
 
     @Override
     public void notice(boolean good, String lead, String rest, long at) {
+        if (serverDelivers()) return; // the server sends the alerts and the notices; this computer only keeps its price data fresh
         queue.add(new ValtrinMod.TimedAlert(good ? FlipAlerts.good(lead, rest) : FlipAlerts.warn(lead, rest), at));
     }
 
     @Override
     public void flip(FlipAlert f, long at, boolean real) {
+        if (real && serverDelivers()) return; // the same flip arrives from the server (the "/flip test" alert still shows)
         SellerClick.remember(f.uuid(), f.sellerUuid(), f.sellerName());
         var msg = FlipAlerts.build(f.name(), f.tier(), f.uuid(), f.buy(), f.sell(), f.profit(), f.margin(), f.volume(),
                 f.detail(), f.sellerName(), f.conf(), f.resale());
@@ -35,10 +37,15 @@ final class ModAlertSink implements AlertSink {
         this.link = l;
     }
 
+    /** True while the Valtrin server is delivering the alerts. */
+    private boolean serverDelivers() {
+        ServerLink l = link;
+        return l != null && l.connected();
+    }
+
     @Override
     public boolean onHypixel() {
-        // while the Valtrin server is delivering alerts, this computer does not search Hypixel itself
-        ServerLink l = link;
-        return ValtrinMod.onHypixel && !(l != null && l.connected());
+        // Polling goes on while the server delivers alerts: it keeps the price tooltips and the AH colours fresh. Its own alerts are dropped above.
+        return ValtrinMod.onHypixel;
     }
 }

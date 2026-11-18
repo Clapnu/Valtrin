@@ -32,6 +32,11 @@ final class SuggestedPrice {
             options = List.of();
             return false;
         }
+        if (!Market.fresh()) {
+            detail = "waiting for market data...";
+            options = List.of();
+            return false;
+        }
         if (OwnModel.loading(d)) { detail = "loading sales data..."; return false; }
 
         OwnModel.Lbins lb = OwnModel.lbins(d, -1, 1);
