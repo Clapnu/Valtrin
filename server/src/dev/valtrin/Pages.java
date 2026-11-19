@@ -134,7 +134,7 @@ final class Pages {
                 + "<li>It does not read your Minecraft login or session, and it does not use or share any Hypixel API key.</li>"
                 + "<li>It only presents public market information. Every decision, and every purchase, is made by the player.</li></ul>"
                 + "<h2>Plans</h2><ul class=list>"
-                + "<li><b>Free:</b> every alert, with a 15 second delay. Free keys are given to anyone who signs in with Discord.</li>"
+                + "<li><b>Free:</b> every alert, with a 7 second delay. Free keys are given to anyone who signs in with Discord.</li>"
                 + "<li><b>Premium (planned):</b> the same alerts without the delay. It will only be offered with Hypixel's approval, and priced fairly.</li></ul>"
                 + "<h2>Privacy</h2><ul class=list>"
                 + "<li>To give each person one key, the server keeps their Discord account number. It does not keep Discord names, emails or passwords, and Discord login tokens are discarded right after use.</li>"
@@ -154,7 +154,7 @@ final class Pages {
     /** Terms of Service, linked from the Discord application settings. Plain language, accurate to what the server does. */
     static String terms(String contactEmail) {
         return page("Valtrin: Terms of Service", ""
-                + "<h1>Terms of Service</h1><p class=sub>Last updated 17 November 2026</p>"
+                + "<h1>Terms of Service</h1><p class=sub>Last updated 18 November 2026</p>"
                 + "<p>These terms cover the Valtrin alert service (this server and the Valtrin mod). By getting a key or using the service you agree to them.</p>"
                 + "<h2>What the service is</h2><p>Valtrin shows estimates of Hypixel SkyBlock Auction House flips. The estimates are information only. "
                 + "They can be wrong or out of date, and nothing here is a promise of profit. You decide whether to buy, and you carry any loss.</p>"
@@ -166,11 +166,13 @@ final class Pages {
                 + "<li>Do not attack, overload, scan or try to break the service, and do not try to get around its limits or delays.</li>"
                 + "<li>Do not copy, resell or republish the alert stream, or use it to run a competing service.</li>"
                 + "<li>Do not use it in a way that breaks Hypixel's or Minecraft's rules. Valtrin never plays the game for you; keep it that way.</li></ul>"
-                + "<h2>Free and paid use</h2><p>Free use gives every alert with a 15 second delay. A paid option without the delay is planned and will be offered only "
+                + "<h2>Free and paid use</h2><p>Free use gives every alert with a 7 second delay. A paid option without the delay is planned and will be offered only "
                 + "if Hypixel allows it. Nothing is charged today.</p>"
                 + "<h2>Changes, access and ending</h2><p>The service is provided as it is, with no promise that it will always be available or accurate. "
                 + "Keys can be limited or cancelled, for example for abuse. The service or these terms may change; the date above shows the latest version. "
                 + "To the extent the law allows, Valtrin is not liable for losses from using the service.</p>"
+                + "<h2>Made with AI</h2><p>Valtrin is built by one person, with the help of AI tools (Anthropic's Claude) for writing and reviewing code. "
+                + "It is tested, but it has not been audited by an outside party, and it may contain mistakes. Use it at your own risk.</p>"
                 + "<h2>Not affiliated</h2><p>Valtrin is not affiliated with, endorsed by or connected to Hypixel Inc. or Mojang/Microsoft. Hypixel and Minecraft are trademarks of their owners.</p>"
                 + contactLine(contactEmail)
                 + "<p><a href=/>&larr; Back</a> &middot; <a href=/privacy>Privacy Policy</a></p>", false, true);

@@ -12,11 +12,15 @@ Valtrin is a client-side Fabric mod that watches Hypixel's public auction data a
 
 ---
 
+## Made with AI
+
+Valtrin is built by one person (Clapnu) who does not write code by hand. Claude, an AI assistant from Anthropic, wrote and reviewed most of the code, the tests, the server and the documentation, directed and checked by the author. The security review in SECURITY.md was done the same way and has **not** been audited by an outside party. The software is provided as it is, with no warranty. Read the source, check the release hash, and use it at your own risk. Independent reviews are welcome.
+
 ## Principles
 
 - **Alerts and tooltips only.** Valtrin never buys, bids, clicks in a menu or sends a command for you. Every purchase is your own action.
-- **No API key.** It reads Hypixel's public auction endpoints only.
-- **Client-side.** Nothing to install on a server. Your settings and data stay on your computer.
+- **No Hypixel API key.** It reads Hypixel's public auction endpoints only. The optional Valtrin server uses its own free access key.
+- **Client-side.** Nothing to install on a server. Your settings and data stay on your computer, unless you turn on the optional server features (alerts from the server, shared sales, Flip Stats sharing), which are off by default.
 
 ## Features
 
@@ -111,6 +115,14 @@ Requires JDK 25.
 ```
 
 The mod jar is created in `build/libs/`. Use the one without `-sources`.
+
+## Verify a download
+
+Each release page lists the SHA-256 of its jar. Check yours on Windows with:
+```
+Get-FileHash .\Valtrin-<version>.jar -Algorithm SHA256
+```
+On Mac / Linux: `shasum -a 256 Valtrin-<version>.jar`. If it does not match the release page, do not use it. You can also build the same tagged source yourself (above) and read it first. See SECURITY.md for what has and has not been reviewed.
 
 ## Project layout
 

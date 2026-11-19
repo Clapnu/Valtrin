@@ -1,6 +1,7 @@
 server/build/
 server/valtrin-server.jar
 *.jar
+!gradle/wrapper/gradle-wrapper.jar
 *.zip
 *.tgz
 build/

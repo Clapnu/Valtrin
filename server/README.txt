@@ -16,7 +16,7 @@ Web interface (all need the header  X-Key: <access key>; GET, except where noted
 Settings: config/valtrin-server.properties (made on first start, inside the data folder given by -Duser.home):
     bind=127.0.0.1          keep this when Caddy (HTTPS) is in front
     port=8080
-    freeDelaySeconds=15     delay for FREE keys
+    freeDelaySeconds=7      delay for FREE keys
     premiumEnabled=false    premium keys get no delay ONLY when this is true; leave false until Hypixel has approved selling
     maxSessions=300
     maxFailsPerMinute=20    wrong-key attempts per address before it is blocked for the rest of the minute

@@ -1,6 +1,8 @@
 # Valtrin: Security Review
 
-**Version reviewed:** 23.7.10 in full; 23.9.0 adds the server program and the mod's optional server connection, reviewed in section 9 · **Scope:** the Valtrin client mod and the server program in `server/` · **Method:** source review (AI-assisted reading, author-directed), then fixes and hostile-input tests
+**Version reviewed:** 23.7.10 in full; 23.9.0 adds the server program and the mod's optional server connection, reviewed in section 9; 23.9.7 adds server-side auction commands and tooltip fixes, covered only by the automated tests and the notes in section 10, not by a full re-read · **Scope:** the Valtrin client mod and the server program in `server/` · **Method:** source review (AI-assisted reading, author-directed), then fixes and hostile-input tests
+
+**Made with AI:** the code and this review were produced with AI assistance (Claude) and directed by the author, who does not write code by hand. Nothing here is an independent audit.
 
 This document lists what Valtrin touches, what could go wrong, what has been fixed, and what is still open. Status is reported as it is: a finding is only **Fixed** if the change is in the code and covered by the checks in section 6.
 
@@ -30,7 +32,7 @@ Java 25, one third-party library (Gson, which Minecraft already ships).
 | F5 | Local files in `ValtrinData` and the config folder | n/a | n/a |
 | F6 | Game chat lines | n/a | Hypixel system messages (used for the profit stats) |
 
-**Not collected:** no account name, no tokens, no telemetry, no analytics, no crash reporting. By default Valtrin makes network requests only while you are connected to Hypixel.
+**Not collected by the mod:** no account name, no tokens, no telemetry, no analytics, no crash reporting. By default the mod makes network requests only while you are connected to Hypixel. Everything the *optional* Valtrin server keeps is listed in section 10 (that includes a Discord account number, and a Minecraft name only if you use `/link` on Discord).
 
 ## 4. Findings and status
 
@@ -61,14 +63,14 @@ Java 25, one third-party library (Gson, which Minecraft already ships).
 
 ## 6. Tests
 
-`tools/securitytests` contains hostile-input tests, run against the compiled mod classes. **Result: 139 passed, 0 failed.**
+`tools/securitytests` contains hostile-input tests, run against the compiled mod classes. **Result: 140 passed, 0 failed (23.9.7).**
 
 They cover path-like and newline-containing IDs, username and URL validation, fake and oversized chat lines, trade lines, about 9,000 random or truncated item blobs, 100,000-level nesting, a list claiming 2 billion entries, a decompression bomb, negative array sizes and out-of-range settings.
 
 ## 7. Still open
 
 - **Static analysis** (SpotBugs or similar) has not been run.
-- **Dependency and release checks:** a published SHA-256 per release jar and Gradle dependency verification are not set up yet.
+- **Release checks:** each release now lists a SHA-256 for its jar (see "Verify a download" in the README), and the build wrapper files are in the repository, so anyone can build the source and compare. Gradle dependency verification is still not set up, and a build is not yet byte-for-byte reproducible, so a rebuilt jar may differ in its hash even from identical source.
 - **The shared-server key is stored in plain text** in the config file (see E4).
 - **Shared-server data is not signed.** Valtrin trusts the server you configure to send valid data, and validates it only by parsing it.
 - **The tests are not wired into the build.** They run by hand.
@@ -89,7 +91,7 @@ Reviewed by the author with AI assistance; not audited by an outside party. Test
 
 **Server side.**
 - Keys: 256 random bits (`vk_` + 43 characters), stored only as SHA-256 hashes in a file readable by the server's user only; a leaked file does not reveal keys. Keys are shown once when made. Key text is never logged and request headers are removed from the web server's log.
-- Access: every request needs a valid key; only GET is accepted; unknown paths give 404. Wrong keys are rate-limited per client address (default 20 a minute, then 429 even for a correct key from that address until the minute ends). History requests are limited per key (token bucket). The item id of a history request must match a strict pattern, so it cannot reach other files.
+- Access: the data endpoints (`/v1/...`) need a valid key; the public pages (home, terms, privacy, get-a-key, Discord sign-in) do not. The data endpoints take only GET, except `/v1/stats`, which also takes POST and DELETE (premium keys only), and the key-redeem form, which takes POST. Other methods give 405 and unknown paths give 404. Wrong keys are rate-limited per client address (default 20 a minute, then 429 even for a correct key from that address until the minute ends). History requests are limited per key (token bucket). The item id of a history request must match a strict pattern, so it cannot reach other files.
 - Capacity: maximum sessions (default 300), one connection per key (a new one replaces the old), a bounded queue per connection (a client that stops reading is dropped), header count and request time limits.
 - Revoking a key stops new connections at once and ends an open one within 15 s.
 - Delays: premium keys get no delay only when `premiumEnabled=true`; otherwise they get the free delay, so nothing is given away before selling is allowed.
@@ -108,3 +110,23 @@ If you find a security problem, please report it privately through **GitHub Secu
 *Valtrin is an independent project and is not affiliated with or endorsed by Hypixel Inc. or Mojang.*
 
 **Plan roles on Discord (optional).** When configured, the server uses a bot token to add or remove a "Free Plan" / "Premium Plan" role. It is deliberately not a chat bot: there is no live connection to Discord, it reads no messages and it has no commands, only one-off web requests to add or remove a role. The token lives in a file readable only by the server's user, is sent only to Discord in an Authorization header, and is never logged or put in the settings file. Only numeric ids that pass a strict check are placed in a request address; requests have time limits, redirects are not followed, at most 2 KB of an answer is read and it is only checked for Discord's "unknown role" code, and the server makes at most 60 requests per check, one every quarter second, and stops on a rate-limit answer. If the token is wrong or the permission is missing, only role-giving stops; keys and alerts are unaffected. Tested with a pretend Discord (role given at sign-in, premium swap, someone not in the server, cancelled key, token only in the Authorization header, off without a token).
+
+## 10. What the optional server keeps, and how far to trust it (added for 23.9.7)
+
+This is the one place that lists what the Valtrin server (api.valtrin.app) keeps. None of it applies if you never use the server.
+
+| What | When | Kept | How to remove |
+|---|---|---|---|
+| Hash of your access key | you get a key | until revoked | ask, or get a new key |
+| Discord account number and time of last key | you sign in with Discord | until deleted | ask the contact on the Privacy page |
+| Completed flips: time, item, rarity, coins paid and received | only if you turn on stats sharing (Premium only, off by default) | newest 20,000 lines | DELETE on the Flip Stats page |
+| Discord ID, Minecraft name you typed, DM on/off | only if you use `/link` (and `/notify`) in Discord | until `/unlink` | `/unlink` |
+| Auction listings and recent sales, in memory only | always, for `/auctions` | 36 hours, lost on restart | n/a |
+
+`/link` is a self-declared name. It is not verified, and the bot says so. Alerts and prices use only Hypixel's public data. No Hypixel API key is used anywhere.
+
+**Trust model.** Server data is not signed, so a mod trusts whichever server address you give it. With **no server address set (the default), the mod uses only data on your own computer**. "Alerts from the server" and the shared sales address (Settings, Advanced) are two separate switches; setting a shared sales address makes the mod read price history from that server and send it your access key. Only enter an address you trust. The mod only accepts https addresses and validates everything it receives, but it cannot prove the prices are correct. The author runs the only public server and has not changed prices, but that is a claim, not something the mod can check for you.
+
+## 11. Verifying a release
+
+Every release lists a SHA-256 for its jar. Compare it with your download (Windows: `Get-FileHash .\Valtrin-<version>.jar -Algorithm SHA256`). To check the jar against the source, build the matching tag with the steps in the README and compare behavior and file listing; a byte-identical match is not guaranteed (see section 7).

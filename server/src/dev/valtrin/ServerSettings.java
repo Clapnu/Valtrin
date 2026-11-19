@@ -43,7 +43,7 @@ final class ServerSettings {
     private ServerSettings(Properties p) {
         bind = p.getProperty("bind", "127.0.0.1").trim();
         port = intIn(p, "port", 8080, 1, 65535);
-        freeDelayMs = intIn(p, "freeDelaySeconds", 15, 0, 3600) * 1000L;
+        freeDelayMs = intIn(p, "freeDelaySeconds", 7, 0, 3600) * 1000L;
         premiumEnabled = Boolean.parseBoolean(p.getProperty("premiumEnabled", "false").trim());
         maxSessions = intIn(p, "maxSessions", 300, 1, 5000);
         maxFailsPerMinute = intIn(p, "maxFailsPerMinute", 20, 1, 10_000);
@@ -91,7 +91,7 @@ final class ServerSettings {
                         bind=127.0.0.1
                         port=8080
                         # Delay for free keys, in seconds.
-                        freeDelaySeconds=15
+                        freeDelaySeconds=7
                         # Premium keys get 0 delay only when this is true. Keep false until Hypixel approves selling.
                         premiumEnabled=false
                         maxSessions=300
