@@ -70,7 +70,7 @@ They cover path-like and newline-containing IDs, username and URL validation, fa
 ## 7. Still open
 
 - **Static analysis** (SpotBugs or similar) has not been run.
-- **Release checks:** each release lists a SHA-256 for its jar (see "Verify a download" in the README), and the Gradle wrapper is in the repository. Builds use fixed file order and timestamps, and repeated clean builds on the author's computer give the same jar. The 23.9.7 jar matched a fresh build of the source in all 112 other files; the only difference was the license file (see section 11). Not yet checked on a second computer. Gradle dependency verification is still not set up.
+- **Release checks:** each release lists a SHA-256 for its jar (see "Verify a download" in the README), and the Gradle wrapper is in the repository. Builds use fixed file order and timestamps, and repeated clean builds on the author's computer give the same jar. The 23.9.7 jar matched a fresh build of the source in all 112 other files; the only difference was the license file (see section 11). Not yet checked on a second computer. Since 23.9.9 Gradle dependency verification is on: `gradle/verification-metadata.xml` holds a SHA-256 for every library and plugin Gradle fetches, Loom is pinned to a fixed version, and the Gradle download itself is pinned by checksum in the wrapper settings, so a changed dependency fails the build. This checks hashes, not signatures, and it does not cover files Loom downloads on its own (Minecraft itself).
 - **The shared-server key is stored in plain text** in the config file (see E4).
 - **Shared-server data is not signed.** Valtrin trusts the server you configure to send valid data, and validates it only by parsing it.
 - **The tests are not wired into the build.** They run by hand.
@@ -125,7 +125,7 @@ This is the one place that lists what the Valtrin server (api.valtrin.app) keeps
 
 `/link` is a self-declared name. It is not verified, and the bot says so. Alerts and prices use only Hypixel's public data. No Hypixel API key is used anywhere.
 
-**Trust model.** Server data is not signed, so a mod trusts whichever server address you give it. With **no server address set (the default), the mod uses only data on your own computer**. "Alerts from the server" and the shared sales address (Settings, Advanced) are two separate switches; setting a shared sales address makes the mod read price history from that server and send it your access key. Only enter an address you trust. The mod only accepts https addresses and validates everything it receives, but it cannot prove the prices are correct. The author runs the only public server and has not changed prices, but that is a claim, not something the mod can check for you.
+**Trust model.** (Since 23.9.9 the Settings screen, `/flip server` and `/flip status` say this in the game too.) Server data is not signed, so a mod trusts whichever server address you give it. With **no server address set (the default), the mod uses only data on your own computer**. "Alerts from the server" and the shared sales address (Settings, Advanced) are two separate switches; setting a shared sales address makes the mod read price history from that server and send it your access key. Only enter an address you trust. The mod only accepts https addresses and validates everything it receives, but it cannot prove the prices are correct. The author runs the only public server and has not changed prices, but that is a claim, not something the mod can check for you.
 
 ## 11. Verifying a release
 

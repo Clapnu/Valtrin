@@ -213,7 +213,7 @@ public final class SettingsScreen extends Screen {
                 r.add(field("Pages at once", "Auction pages downloaded together (10 = gentler).", () -> Integer.toString(c().pageBatch), intSetter(1, 100, v -> c().pageBatch = v)));
                 r.add(field("Seller name wait (ms)", "Longest wait for a seller name before an alert. 0 = never wait.", () -> Integer.toString(c().sellerWaitMs), intSetter(0, 1000, v -> c().sellerWaitMs = v)));
                 r.add(header("Shared data server"));
-                r.add(field("Server address", "Leave empty to use only data on this computer.", () -> c().sharedUrl, t -> {
+                r.add(field("Server address", "Leave empty to use only data on this computer. If set, sales prices come from that server and your key is sent to it. Only use an address you trust.", () -> c().sharedUrl, t -> {
                     String u = t.trim();
                     if (!u.isEmpty() && !u.equalsIgnoreCase("off") && Validate.serverUrl(u) == null) { say("The address must start with https://"); return true; }
                     c().sharedUrl = u.equalsIgnoreCase("off") ? "" : u;

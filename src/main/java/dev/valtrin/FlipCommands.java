@@ -153,7 +153,7 @@ final class FlipCommands {
                             OwnModel.reconfigure();
                             reply(c.getSource(), FlipConfig.INSTANCE.sharedUrl.isEmpty()
                                     ? "Shared server off: using data on this computer."
-                                    : "Shared server set. Enter the key in the settings screen (/flip menu, Advanced tab) if you have not.", ChatFormatting.GREEN);
+                                    : "Shared server set: sales prices now come from that server and your key is sent to it, so only use an address you trust. Enter the key in the settings screen (/flip menu, Advanced tab) if you have not.", ChatFormatting.GREEN);
                             return 1;
                         })))
                         .then(literal("sharedkey").executes(c -> {
@@ -414,7 +414,7 @@ final class FlipCommands {
         } catch (Exception ex) { writable = false; }
         line.accept(writable, new String[]{"Data folder", writable ? "ValtrinData is writable" : "cannot write to ValtrinData"});
         boolean sharedOk = c.sharedUrl.isEmpty() || Validate.serverUrl(c.sharedUrl) != null;
-        line.accept(sharedOk, new String[]{"Shared server", c.sharedUrl.isEmpty() ? "not used" : sharedOk ? "https address set" : "address refused: it must start with https://"});
+        line.accept(sharedOk, new String[]{"Shared server", c.sharedUrl.isEmpty() ? "not used" : sharedOk ? "in use: prices come from that server, your key is sent to it" : "address refused: it must start with https://"});
         line.accept(c.soundEnabled, new String[]{"Sound", c.soundEnabled ? "on" : "off"});
         boolean strict = c.minProfit > 20_000_000L || c.minVolume > 200 || c.minMarginPercent > 50;
         line.accept(!strict, new String[]{"Filters", FlipConfig.currentPreset() + (strict ? ": very strict, you may see almost no alerts" : "")});

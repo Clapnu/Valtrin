@@ -276,7 +276,7 @@ public final class FlipConfig {
     }
 
     /** The mod version shown in the settings screen and the welcome window (keep equal to fabric.mod.json). */
-    public static final String VERSION = "23.9.8";
+    public static final String VERSION = "23.9.9";
 
     /** A copy of the current settings, so the settings screen can undo its changes with Cancel. */
     static FlipConfig snapshot() {

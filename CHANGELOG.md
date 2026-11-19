@@ -2,6 +2,12 @@
 
 Each release in short. Full notes are on the Modrinth page.
 
+## 23.9.9
+
+- Settings, /flip server and /flip status now say plainly that a shared server address makes sales prices come from that server and sends your key to it. Alerts, prices and speed are unchanged
+- Build: Gradle dependency verification is on. A checksum for every library and plugin is in gradle/verification-metadata.xml, Loom is pinned to 1.19.4 and the Gradle download is pinned by checksum, so a changed dependency fails the build. The jar is still the same every time you build it
+- Site: pet names on the Flip Stats page keep their square brackets again, like [Lvl 100] Mithril Golem
+
 ## 23.9.8
 
 - Fixed: the license file packed inside the jar was a leftover Fabric template file (CC0). It now matches the project license, All Rights Reserved, as in LICENSE, fabric.mod.json and the README. Older jars contain the stale file by mistake
