@@ -1,6 +1,6 @@
 # Valtrin: Security Review
 
-**Version reviewed:** 23.7.10 in full; 23.9.0 adds the server program and the mod's optional server connection, reviewed in section 9; 23.9.7 adds server-side auction commands and tooltip fixes, covered only by the automated tests and the notes in section 10, not by a full re-read · **Scope:** the Valtrin client mod and the server program in `server/` · **Method:** source review (AI-assisted reading, author-directed), then fixes and hostile-input tests
+**Version reviewed:** 23.7.10 in full; 23.9.0 adds the server program and the mod's optional server connection, reviewed in section 9; 23.9.7 adds server-side auction commands and tooltip fixes, read through by the author with AI assistance in section 12 · **Scope:** the Valtrin client mod and the server program in `server/` · **Method:** source review (AI-assisted reading, author-directed), then fixes and hostile-input tests
 
 **Made with AI:** the code and this review were produced with AI assistance (Claude) and directed by the author, who does not write code by hand. Nothing here is an independent audit.
 
@@ -129,4 +129,27 @@ This is the one place that lists what the Valtrin server (api.valtrin.app) keeps
 
 ## 11. Verifying a release
 
-Every release lists a SHA-256 for its jar. Compare it with your download (Windows: `Get-FileHash .\Valtrin-<version>.jar -Algorithm SHA256`). To check the jar against the source, build the matching tag with the steps in the README and compare behavior and file listing; a byte-identical match is not guaranteed (see section 7).
+Every release lists a SHA-256 for its jar. Compare it with your download (Windows: `Get-FileHash .\Valtrin-<version>.jar -Algorithm SHA256`). To check the jar against the source, build with the steps in the README and compare behavior and file listing; a byte-identical match is not guaranteed (see section 7). The `v23.9.7` tag predates the Gradle wrapper files, so build from `main` (same mod code, plus the wrapper and docs) until the next release, whose tag will include them.
+
+## 12. Review of the 23.9.7 server additions (auction commands, links, sale DMs)
+
+Reviewed by the author with AI assistance; not audited by an outside party. Scope: `AuctionCommands`, `AuctionIndex`, `AuctionImage`, `NotifyStore` and the hooks the mod's engine calls (`AuctionFeed`). Checked by reading the code and by 185 server tests.
+
+**Sound as written**
+- Everything is built from Hypixel's public data. No Hypixel API key is used or stored.
+- Discord ids, interaction tokens, Minecraft names, profile ids and button ids are checked against strict patterns before they go into a request address or a file. Names are letters, digits and underscore only, so nothing can break a line of the links file.
+- Replies never ping anyone (`allowed_mentions` is empty). Redirects are never followed. The bot token is only sent in the Authorization header of Discord requests.
+- Sale DMs go only to someone who turned them on, with a test message first, at most 30 an hour per person, and an off button on every DM.
+- The hook that feeds the index is a one-way copy of data the engine already has; a failure in it is swallowed and cannot stop alerts.
+
+**Found and fixed in this review**
+- Item names come from other players. They are now stripped of colour codes and control characters (cut at 80), and escaped before going into any Discord text, so a name cannot make a link, a mention or a new line in a DM or in the text answer. (The picture is drawn as pixels and was not affected.)
+- One item that failed to draw switched pictures off for everyone until a restart. It now falls back to text for that request only, and pictures stay on unless the machine truly cannot draw.
+- Pictures are drawn at most two at a time, so a burst of `/auctions` cannot take processor time from the alert stream.
+- Mojang's answer is now limited to 4 KB while it is read, not after.
+- `discord-links.tsv` is now readable only by the server's user, like the key files.
+- Buttons and the sort menu on a picture now only work for the person who ran the command, so a stranger cannot change what someone else sees.
+
+**Known and accepted**
+- `/link` is a name the person types. Anyone can link a name that is not theirs and get DMs about that player's sales. Those sales are public data (the item, the price and the buyer), and the bot says the link is unverified. Proving ownership needs Hypixel's API.
+- "Sold recently" cannot tell whether a sale was claimed, and it starts empty after a restart.

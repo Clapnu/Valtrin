@@ -84,6 +84,7 @@ final class NotifyStore {
             if (file.getParent() != null) Files.createDirectories(file.getParent());
             Path tmp = file.resolveSibling(file.getFileName() + ".tmp");
             Files.writeString(tmp, sb.toString(), StandardCharsets.UTF_8);
+            try { Files.setPosixFilePermissions(tmp, java.nio.file.attribute.PosixFilePermissions.fromString("rw-------")); } catch (UnsupportedOperationException ignored) {}
             Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING);
         } catch (IOException e) {
             Log.LOGGER.warn("Could not save the Discord links: {}", e.toString());

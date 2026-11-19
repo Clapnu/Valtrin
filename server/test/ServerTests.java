@@ -405,10 +405,10 @@ public final class ServerTests {
 
             // the picture
             java.util.List<AuctionImage.Card> cards = new java.util.ArrayList<>();
-            cards.add(new AuctionImage.Card("Heroic Spirit Sceptre", "LEGENDARY", 5, 0, 13_010_000L, 1, "→ BuyerOne", 0, true));
+            cards.add(new AuctionImage.Card("Heroic Spirit Sceptre", "LEGENDARY", 5, 0, 13_010_000L, 1, "→ Matin007s", 0, true));
             cards.add(new AuctionImage.Card("Hyperion", "LEGENDARY", 5, 3, 820_000_000L, 1, "47m left", 2, false));
             cards.add(new AuctionImage.Card("Builder's Wand", "LEGENDARY", 0, 0, 15_000_000L, 6, "13d 0h left", 0, false));
-            byte[] png = AuctionImage.render("Tester", "Updated just now · page 1 / 1", 4, 1, 13_010_000L, cards);
+            byte[] png = AuctionImage.render("Clapnu", "Updated just now · page 1 / 1", 4, 1, 13_010_000L, cards);
             check("auctions picture: a PNG with the expected size", png.length > 2000 && png[1] == 'P' && png[2] == 'N' && png[3] == 'G');
             java.awt.image.BufferedImage back = javax.imageio.ImageIO.read(new java.io.ByteArrayInputStream(png));
             check("auctions picture: 920 points wide at 2x, one row of cards", back.getWidth() == 1840 && back.getHeight() == (AuctionImage.HEAD_H + AuctionImage.CARD_H + AuctionImage.GAP + 34) * 2);
@@ -428,7 +428,7 @@ public final class ServerTests {
                 seen.add(ex.getRequestMethod() + " " + ex.getRequestURI().getPath() + " ct=" + ex.getRequestHeaders().getFirst("Content-Type") + " " + body);
                 String path = ex.getRequestURI().getPath();
                 byte[] out = new byte[0];
-                if (path.equals("/users/profiles/minecraft/Tester") || path.equalsIgnoreCase("/minecraft/profile/lookup/name/Tester")) out = ("{\"id\":\"" + SELLER + "\",\"name\":\"Tester\"}").getBytes();
+                if (path.equals("/users/profiles/minecraft/Clapnu") || path.equalsIgnoreCase("/minecraft/profile/lookup/name/Clapnu")) out = ("{\"id\":\"" + SELLER + "\",\"name\":\"Clapnu\"}").getBytes();
                 else if (path.equals("/users/@me/channels")) out = "{\"id\":\"555555555555555555\"}".getBytes();
                 ex.sendResponseHeaders((path.startsWith("/users/profiles/minecraft/") || path.startsWith("/minecraft/profile/lookup/")) && out.length == 0 ? 404 : 200, out.length == 0 ? -1 : out.length);
                 if (out.length > 0) ex.getResponseBody().write(out);
@@ -438,16 +438,16 @@ public final class ServerTests {
             try {
                 String sb = "http://127.0.0.1:" + stub.getAddress().getPort();
                 NotifyStore ns = new NotifyStore(dir.resolve("aucfg/links.tsv"));
-                AuctionCommands ac = new AuctionCommands(as, "tok.en.value-0123456789abcdefghij", ix, ns, u -> java.util.Map.of("22222222222222222222222222222222", "BuyerOne"), sb, sb);
+                AuctionCommands ac = new AuctionCommands(as, "tok.en.value-0123456789abcdefghij", ix, ns, u -> java.util.Map.of("22222222222222222222222222222222", "Matin007s"), sb, sb);
                 ac.checkImage();
                 String ixTok = "abcdefghijklmnopqrstuvwxyz0123456789";
                 java.util.function.BiFunction<String, String, String> cmd = (name, opts) -> "{\"type\":2,\"id\":\"987654321098765432\",\"token\":\"" + ixTok + "\",\"member\":{\"user\":{\"id\":\"777777777777777777\"}},\"data\":{\"name\":\"" + name + "\"" + (opts == null ? "" : ",\"options\":" + opts) + "}}";
 
                 check("auctions command: /auctions with nothing linked asks to link (private)", ac.handle(parse(cmd.apply("auctions", null))) && waitFor(seen, "Type a Minecraft name") && seen.get(0).contains("\"flags\":64") && seen.get(0).contains("\"type\":4"));
                 seen.clear();
-                ac.handle(parse(cmd.apply("link", "[{\"name\":\"name\",\"type\":3,\"value\":\"Tester\"}]")));
-                check("auctions command: /link looks the name up and answers privately", waitFor(seen, "Linked to **Tester**") && ns.get("777777777777777777") != null && ns.get("777777777777777777").uuid().equals(SELLER)
-                    && seen.stream().anyMatch(x -> x.startsWith("GET /users/profiles/minecraft/Tester")) && seen.stream().anyMatch(x -> x.contains("\"type\":5") && x.contains("\"flags\":64")));
+                ac.handle(parse(cmd.apply("link", "[{\"name\":\"name\",\"type\":3,\"value\":\"Clapnu\"}]")));
+                check("auctions command: /link looks the name up and answers privately", waitFor(seen, "Linked to **Clapnu**") && ns.get("777777777777777777") != null && ns.get("777777777777777777").uuid().equals(SELLER)
+                    && seen.stream().anyMatch(x -> x.startsWith("GET /users/profiles/minecraft/Clapnu")) && seen.stream().anyMatch(x -> x.contains("\"type\":5") && x.contains("\"flags\":64")));
                 seen.clear();
                 ac.handle(parse(cmd.apply("link", "[{\"name\":\"name\",\"type\":3,\"value\":\"../x\"}]")));
                 check("auctions command: /link refuses a bad name", waitFor(seen, "not a valid Minecraft name"));
@@ -458,7 +458,7 @@ public final class ServerTests {
                 Thread.sleep(3100);
                 seen.clear();
                 ac.fallbackBase(sb);
-                check("auctions names: capital letters do not matter (Mojang fallback)", ac.resolve("tEsTeR") != null && ac.resolve("tEsTeR")[1].equals("Tester"));
+                check("auctions names: capital letters do not matter (Mojang fallback)", ac.resolve("cLaPnU") != null && ac.resolve("cLaPnU")[1].equals("Clapnu"));
                 Files.writeString(dir.resolve("aucfg/names.tsv"), "55555555555555555555555555555555\tSkyHelperFan\n");
                 SellerNames.init(dir.resolve("aucfg/names.tsv"));
                 check("auctions names: a name seen as a seller is found in any capitals", ac.resolve("skyhelperFAN") != null && ac.resolve("skyhelperFAN")[1].equals("SkyHelperFan") && ac.resolve("zzzznotreal") == null);
@@ -477,13 +477,23 @@ public final class ServerTests {
                 ac.handle(parse("{\"type\":3,\"id\":\"987654321098765434\",\"token\":\"" + ixTok + "\",\"member\":{\"user\":{\"id\":\"777777777777777777\"}},\"data\":{\"custom_id\":\"au:" + SELLER + ":0:end:all:n\"}}"));
                 check("auctions command: a button redraws the picture", waitFor(seen, "files[0]"));
                 seen.clear();
-                ac.handle(parse("{\"type\":4,\"id\":\"987654321098765435\",\"token\":\"" + ixTok + "\",\"member\":{\"user\":{\"id\":\"777777777777777777\"}},\"data\":{\"name\":\"auctions\",\"options\":[{\"name\":\"username\",\"type\":3,\"value\":\"Tester\"},{\"name\":\"profile\",\"type\":3,\"value\":\"\",\"focused\":true}]}}"));
+                ac.handle(parse("{\"type\":4,\"id\":\"987654321098765435\",\"token\":\"" + ixTok + "\",\"member\":{\"user\":{\"id\":\"777777777777777777\"}},\"data\":{\"name\":\"auctions\",\"options\":[{\"name\":\"username\",\"type\":3,\"value\":\"Clapnu\"},{\"name\":\"profile\",\"type\":3,\"value\":\"\",\"focused\":true}]}}"));
                 check("auctions command: profile suggestions list the profiles with their listing counts", waitFor(seen, "Profile 1 (3 listed)") && seen.stream().anyMatch(x -> x.contains("\"type\":8") && x.contains(PROF_A)));
                 seen.clear();
                 // odd custom ids and unknown things are ignored
                 check("auctions command: odd button ids are ignored",
                     ac.handle(parse("{\"type\":3,\"id\":\"987654321098765436\",\"token\":\"" + ixTok + "\",\"member\":{\"user\":{\"id\":\"777777777777777777\"}},\"data\":{\"custom_id\":\"au:../../x:0:end:all:n\"}}")) && seen.isEmpty()
                     && !ac.handle(parse(cmd.apply("evil", null))) && !ac.handle(parse("{\"type\":2,\"id\":\"../x\",\"token\":\"" + ixTok + "\",\"data\":{\"name\":\"auctions\"}}")));
+
+                // somebody else's buttons: only the person who ran the command may use them
+                seen.clear();
+                ac.handle(parse("{\"type\":3,\"id\":\"987654321098765440\",\"token\":\"" + ixTok + "\",\"member\":{\"user\":{\"id\":\"888888888888888888\"}},\"message\":{\"interaction_metadata\":{\"user\":{\"id\":\"777777777777777777\"}}},\"data\":{\"custom_id\":\"au:" + SELLER + ":0:end:all:n\"}}"));
+                check("auctions buttons: another person cannot use them", waitFor(seen, "Only the person who ran this") && seen.stream().noneMatch(x -> x.contains("files[0]")));
+                String hostile = AuctionCommands.esc("[Free coins](https://evil.example/x) @everyone\n**bold** evil.com");
+                check("auctions text: item names cannot make links, mentions or new lines",
+                    !hostile.contains("](") && !hostile.contains("https://") && !hostile.contains("\n") && !hostile.contains("evil.com") && hostile.contains("Free coins"));
+                check("auctions text: item names lose colour codes and control characters and are cut at 80",
+                    AuctionIndex.clean("\u00a76Hyperion\n\u00a7l").equals("Hyperion") && AuctionIndex.clean("x".repeat(200)).length() == 80);
 
                 // /notify: a DM is sent to check, and a sale sends another
                 seen.clear();
@@ -494,7 +504,10 @@ public final class ServerTests {
                 seen.clear();
                 ix.addSale(new AuctionIndex.Sale("s9", SELLER, PROF_A, "22222222222222222222222222222222", "Hyperion", "LEGENDARY", 5, 3, 820_000_000L, nowMs));
                 check("auctions DM: a sale sends the owner one DM with the item, price and buyer",
-                    waitFor(seen, "820,000,000") && seen.stream().anyMatch(x -> x.startsWith("POST /channels/555555555555555555/messages") && x.contains("Hyperion") && x.contains("BuyerOne") && x.contains("nt:off")));
+                    waitFor(seen, "820,000,000") && seen.stream().anyMatch(x -> x.startsWith("POST /channels/555555555555555555/messages") && x.contains("Hyperion") && x.contains("Matin007s") && x.contains("nt:off")));
+                seen.clear();
+                ix.addSale(new AuctionIndex.Sale("s9b", SELLER, PROF_A, "", "[Click me](https://evil.example)", "RARE", 0, 0, 1_000L, nowMs));
+                check("auctions DM: a hostile item name is not a link in the DM", waitFor(seen, "Click me") && seen.stream().noneMatch(x -> x.contains("](") || x.contains("https://evil")));
                 seen.clear();
                 ix.addSale(new AuctionIndex.Sale("s10", "44444444444444444444444444444444", PROF_A, "", "Other", "RARE", 0, 0, 5L, nowMs));
                 Thread.sleep(300);
@@ -510,16 +523,17 @@ public final class ServerTests {
                 seen.clear();
                 ac.handle(parse(cmd.apply("unlink", null)));
                 check("auctions command: /unlink forgets the link", waitFor(seen, "Your linked Minecraft name and sale DMs are removed") && ns.get("777777777777777777") == null);
-                ns.link("777777777777777777", SELLER, "Tester");
+                ns.link("777777777777777777", SELLER, "Clapnu");
                 // the saved links survive a restart, and a damaged file is survivable
                 NotifyStore again = new NotifyStore(dir.resolve("aucfg/links.tsv"));
-                check("auctions links: saved to a file and read back", again.get("777777777777777777") != null && again.get("777777777777777777").name().equals("Tester"));
+                try { check("auctions links: the file is private to the server's user", Files.getPosixFilePermissions(dir.resolve("aucfg/links.tsv")).toString().equals("[OWNER_READ, OWNER_WRITE]")); } catch (UnsupportedOperationException e) { check("auctions links: private file (not supported here)", true); }
+                check("auctions links: saved to a file and read back", again.get("777777777777777777") != null && again.get("777777777777777777").name().equals("Clapnu"));
                 Files.writeString(dir.resolve("aucfg/links2.tsv"), "garbage\n777777777777777777\tnotauuid\tx\t1\n\n");
                 check("auctions links: a damaged file is skipped line by line", new NotifyStore(dir.resolve("aucfg/links2.tsv")).get("777777777777777777") == null);
-                AuctionCommands.Page apg = ac.build(SELLER, "Tester", "all", 0, "end");
+                AuctionCommands.Page apg = ac.build(SELLER, "Clapnu", "all", 0, "end");
                 check("auctions page: sold card first, 3 wands grouped into 1, 3 cards in all", apg != null && apg.pages() == 1 && apg.text().contains("×3") && apg.text().indexOf("Heroic Spirit Sceptre") < apg.text().indexOf("Builder"));
-                check("auctions page: a profile filter keeps only that profile", ac.build(SELLER, "Tester", PROF_B.substring(0, 8), 0, "end").text().contains("Hyperion")
-                    && !ac.build(SELLER, "Tester", PROF_B.substring(0, 8), 0, "end").text().contains("Builder"));
+                check("auctions page: a profile filter keeps only that profile", ac.build(SELLER, "Clapnu", PROF_B.substring(0, 8), 0, "end").text().contains("Hyperion")
+                    && !ac.build(SELLER, "Clapnu", PROF_B.substring(0, 8), 0, "end").text().contains("Builder"));
                 check("auctions page: nothing to show gives null", ac.build("99999999999999999999999999999999", "Nobody", "all", 0, "end") == null);
                 if (png.length > 0) Files.write(Path.of(System.getProperty("java.io.tmpdir"), "valtrin-auction-sample.png"), png);
             } finally {

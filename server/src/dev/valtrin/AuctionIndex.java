@@ -69,9 +69,9 @@ final class AuctionIndex implements AuctionFeed.Listener {
         boolean bin = o.has("bin") && o.get("bin").getAsBoolean();
         long start = o.has("starting_bid") ? o.get("starting_bid").getAsLong() : 0;
         long bid = o.has("highest_bid_amount") ? o.get("highest_bid_amount").getAsLong() : 0;
-        String name = str(o, "item_name");
+        String name = clean(str(o, "item_name"));
         if (name.isEmpty()) return;
-        Listing l = new Listing(str(o, "uuid"), seller, str(o, "profile_id"), name.length() > 80 ? name.substring(0, 80) : name,
+        Listing l = new Listing(str(o, "uuid"), seller, str(o, "profile_id"), name,
                 o.has("tier") ? str(o, "tier") : "COMMON", bin ? start : Math.max(start, bid),
                 o.has("end") ? o.get("end").getAsLong() : 0, bin);
         building.computeIfAbsent(seller, k -> new ArrayList<>(2)).add(l);
@@ -107,9 +107,15 @@ final class AuctionIndex implements AuctionFeed.Listener {
         ItemData d = ItemKeys.parse(bytes);
         String tier = d == ItemData.NONE || d.tier() == null ? "COMMON" : d.tier();
         long ts = o.has("timestamp") ? o.get("timestamp").getAsLong() : clock.getAsLong();
-        Sale s = new Sale(str(o, "auction_id"), seller, str(o, "seller_profile"), str(o, "buyer"), plain.toString().strip(), tier,
+        Sale s = new Sale(str(o, "auction_id"), seller, str(o, "seller_profile"), str(o, "buyer"), clean(plain.toString()), tier,
                 Math.min(5, stars), master, o.has("price") ? o.get("price").getAsLong() : 0, ts);
         addSale(s);
+    }
+
+    /** An item name that is safe to show: colour codes and control characters removed, one line, at most 80 characters. */
+    static String clean(String s) {
+        if (s == null) return "";
+        return Validate.text(s.replaceAll("\u00a7.?", ""), 80).strip();
     }
 
     void addSale(Sale s) {

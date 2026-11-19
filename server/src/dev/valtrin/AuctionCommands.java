@@ -52,6 +52,8 @@ final class AuctionCommands {
     private final ConcurrentHashMap<String, String> dmChannels = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, long[]> dmCount = new ConcurrentHashMap<>();
     private volatile boolean imageOk = true;
+    /** At most two pictures are drawn at once, so a rush of /auctions can never take CPU from the alert stream. */
+    private final java.util.concurrent.Semaphore drawing = new java.util.concurrent.Semaphore(2);
 
     AuctionCommands(ServerSettings cfg, String token, AuctionIndex index, NotifyStore store,
                     Function<Collection<String>, Map<String, String>> names, String base, String mojang) {
@@ -135,7 +137,7 @@ final class AuctionCommands {
             }
             if (type == 3) {
                 String cid = str(data, "custom_id");
-                if (cid.startsWith("au:") || cid.startsWith("as:")) { component(id, itok, user, cid, data); return true; }
+                if (cid.startsWith("au:") || cid.startsWith("as:")) { component(id, itok, user, cid, data, d); return true; }
                 if (cid.equals("nt:off")) { notifyOff(id, itok, user); return true; }
             }
             return false;
@@ -143,6 +145,21 @@ final class AuctionCommands {
             Log.LOGGER.warn("An auction command failed: {}", e.toString());
             return false;
         }
+    }
+
+    /** Who ran the command a message belongs to (null when Discord does not say). */
+    private static String ownerOf(JsonObject d) {
+        try {
+            JsonObject m = d.has("message") && d.get("message").isJsonObject() ? d.getAsJsonObject("message") : null;
+            if (m == null) return null;
+            for (String k : new String[]{"interaction_metadata", "interaction"}) {
+                if (m.has(k) && m.get(k).isJsonObject() && m.getAsJsonObject(k).has("user") && m.getAsJsonObject(k).get("user").isJsonObject()) {
+                    String id = str(m.getAsJsonObject(k).getAsJsonObject("user"), "id");
+                    if (ID.matcher(id).matches()) return id;
+                }
+            }
+        } catch (RuntimeException ignored) {}
+        return null;
     }
 
     private static String userId(JsonObject d) {
@@ -247,7 +264,7 @@ final class AuctionCommands {
         });
     }
 
-    private void component(String id, String itok, String user, String cid, JsonObject data) {
+    private void component(String id, String itok, String user, String cid, JsonObject data, JsonObject d) {
         String[] p = cid.split(":");
         // au:<uuid>:<page>:<sort>:<profile>   as:<uuid>:<profile>  (the sort menu; value = sort)
         try {
@@ -264,6 +281,8 @@ final class AuctionCommands {
                 if (data.has("values") && data.getAsJsonArray("values").size() > 0) sort = data.getAsJsonArray("values").get(0).getAsString();
             }
             if (!PROF.matcher(prof).matches() || !java.util.Arrays.asList(SORTS).contains(sort) || page < 0 || page > 500) return;
+            String owner = ownerOf(d);
+            if (owner != null && !owner.equals(user)) { ephemeral(id, itok, "Only the person who ran this can use its buttons. Run `/auctions` yourself to get your own."); return; }
             if (rateLimited("c" + user, 1500)) { respond(id, itok, 6, null); return; }
             respond(id, itok, 6, null); // acknowledge now, edit the message next
             final String f1 = sort, f2 = prof;
@@ -360,8 +379,19 @@ final class AuctionCommands {
         String foot = "Updated just now · page " + (pg + 1) + " / " + pages;
         byte[] png = null;
         if (imageOk) {
-            try { png = AuctionImage.render(name, foot, ls.size(), ss.size(), soldTotal, slice); }
-            catch (Throwable t) { imageOk = false; Log.LOGGER.warn("Drawing the auction picture failed, switching to text: {}", t.toString()); }
+            boolean got = false;
+            try {
+                got = drawing.tryAcquire(2, java.util.concurrent.TimeUnit.SECONDS);
+                if (got) png = AuctionImage.render(name, foot, ls.size(), ss.size(), soldTotal, slice);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            } catch (Throwable t) {
+                // one odd item must not switch pictures off for everyone: only stop if this machine really cannot draw
+                Log.LOGGER.warn("Drawing the auction picture failed, answering this one in text: {}", t.toString());
+                if (!AuctionImage.available()) imageOk = false;
+            } finally {
+                if (got) drawing.release();
+            }
         }
         return new Page(png, textFor(name, ls.size(), ss.size(), soldTotal, slice, foot), pg, pages, uuid, prof, sort);
     }
@@ -370,7 +400,7 @@ final class AuctionCommands {
         StringBuilder sb = new StringBuilder("**").append(name).append("**: ").append(listed).append(" listed, ").append(sold).append(" sold recently (")
                 .append(Format.compact(soldTotal)).append(")\n");
         for (AuctionImage.Card c : cards) {
-            sb.append(c.sold() ? "✅ ~~" : "• ").append(c.name()).append(c.stars() > 0 ? " " + "✪".repeat(c.stars()) : "")
+            sb.append(c.sold() ? "✅ ~~" : "• ").append(esc(c.name())).append(c.stars() > 0 ? " " + "✪".repeat(c.stars()) : "")
                     .append(c.count() > 1 ? " ×" + c.count() : "").append(c.sold() ? "~~" : "").append(" — **").append(Format.compact(c.price()))
                     .append("**").append(c.count() > 1 ? " each" : "").append(" — ").append(c.line()).append('\n');
         }
@@ -392,6 +422,19 @@ final class AuctionCommands {
         String[] order = {"COMMON", "UNCOMMON", "RARE", "EPIC", "LEGENDARY", "MYTHIC", "DIVINE", "SPECIAL", "VERY_SPECIAL", "ULTIMATE", "SUPREME"};
         for (int i = 0; i < order.length; i++) if (order[i].equalsIgnoreCase(tier)) return i;
         return 0;
+    }
+
+    /** Item names come from other players, so before they go into Discord text: no markdown, no clickable links, one line. */
+    static String esc(String s) {
+        if (s == null) return "";
+        StringBuilder b = new StringBuilder(s.length() + 8);
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (c < 32 || c == 127) { b.append(' '); continue; }
+            if ("\\*_~`|>[]()<#@:".indexOf(c) >= 0) b.append('\\');
+            b.append(c);
+        }
+        return b.toString().replace("://", ":\u200b//").replaceAll("\\.(?=[A-Za-z])", ".\u200b");
     }
 
     static String left(long ms) {
@@ -422,7 +465,7 @@ final class AuctionCommands {
                 JsonObject embed = new JsonObject();
                 embed.addProperty("title", "Auction sold");
                 embed.addProperty("color", 0x3ba55d);
-                String item = s.name() + (s.stars() > 0 ? " " + "✪".repeat(s.stars()) : "") + (s.master() > 0 ? String.valueOf((char) ('➉' + s.master())) : "");
+                String item = esc(s.name()) + (s.stars() > 0 ? " " + "✪".repeat(s.stars()) : "") + (s.master() > 0 ? String.valueOf((char) ('➉' + s.master())) : "");
                 embed.addProperty("description", "**" + item + "**\nSold for **" + String.format(Locale.ROOT, "%,d", s.price()) + "** coins"
                         + (buyer != null ? " to **" + buyer + "**" : "") + ".\nClaim it from the Auction House in game. `/auctions` shows the rest.");
                 JsonObject msg = new JsonObject();
@@ -485,9 +528,12 @@ final class AuctionCommands {
     private String[] lookup(String url) {
         try {
             HttpRequest rq = HttpRequest.newBuilder(URI.create(url)).timeout(Duration.ofSeconds(4)).header("User-Agent", "Valtrin/1.0").GET().build();
-            HttpResponse<String> r = http.send(rq, HttpResponse.BodyHandlers.ofString());
-            if (r.statusCode() != 200 || r.body().length() > 4096) return null;
-            JsonObject o = JsonParser.parseString(r.body()).getAsJsonObject();
+            HttpResponse<java.io.InputStream> r = http.send(rq, HttpResponse.BodyHandlers.ofInputStream());
+            if (r.statusCode() != 200) { r.body().close(); return null; }
+            byte[] raw;
+            try (java.io.InputStream in = r.body()) { raw = in.readNBytes(4097); }
+            if (raw.length > 4096) return null;
+            JsonObject o = JsonParser.parseString(new String(raw, StandardCharsets.UTF_8)).getAsJsonObject();
             String id = str(o, "id"), nm = str(o, "name");
             return Validate.uuid(id) && Validate.player(nm) ? new String[]{id, nm} : null;
         } catch (Exception e) {
