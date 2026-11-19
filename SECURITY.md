@@ -70,7 +70,7 @@ They cover path-like and newline-containing IDs, username and URL validation, fa
 ## 7. Still open
 
 - **Static analysis** (SpotBugs or similar) has not been run.
-- **Release checks:** each release now lists a SHA-256 for its jar (see "Verify a download" in the README), and the build wrapper files are in the repository, so anyone can build the source and compare. Gradle dependency verification is still not set up, and a build is not yet byte-for-byte reproducible, so a rebuilt jar may differ in its hash even from identical source.
+- **Release checks:** each release lists a SHA-256 for its jar (see "Verify a download" in the README), and the Gradle wrapper is in the repository. Builds use fixed file order and timestamps, and repeated clean builds on the author's computer give the same jar. The 23.9.7 jar matched a fresh build of the source in all 112 other files; the only difference was the license file (see section 11). Not yet checked on a second computer. Gradle dependency verification is still not set up.
 - **The shared-server key is stored in plain text** in the config file (see E4).
 - **Shared-server data is not signed.** Valtrin trusts the server you configure to send valid data, and validates it only by parsing it.
 - **The tests are not wired into the build.** They run by hand.
@@ -129,7 +129,9 @@ This is the one place that lists what the Valtrin server (api.valtrin.app) keeps
 
 ## 11. Verifying a release
 
-Every release lists a SHA-256 for its jar. Compare it with your download (Windows: `Get-FileHash .\Valtrin-<version>.jar -Algorithm SHA256`). To check the jar against the source, build with the steps in the README and compare behavior and file listing; a byte-identical match is not guaranteed (see section 7). The `v23.9.7` tag predates the Gradle wrapper files, so build from `main` (same mod code, plus the wrapper and docs) until the next release, whose tag will include them.
+Every release lists a SHA-256 for its jar. Compare it with your download (Windows: `Get-FileHash .\Valtrin-<version>.jar -Algorithm SHA256`). To check the jar against the source, build with the steps in the README and compare behavior and file listing; a byte-identical match is not guaranteed (see section 7). Tags from `v23.9.8` on include the Gradle wrapper. The older tags do not, so build those from `main` (same mod code).
+
+**License note.** Jars before 23.9.8 contain a CC0 license file by mistake (a leftover from the Fabric template). Valtrin's license is All Rights Reserved, as stated in LICENSE, `fabric.mod.json` and the README; 23.9.8 packs the correct file.
 
 ## 12. Review of the 23.9.7 server additions (auction commands, links, sale DMs)
 

@@ -68,3 +68,9 @@ publishing {
 		// retrieving dependencies.
 	}
 }
+
+// Same source gives the same jar: fixed file order and fixed timestamps
+tasks.withType(AbstractArchiveTask).configureEach {
+    preserveFileTimestamps = false
+    reproducibleFileOrder = true
+}

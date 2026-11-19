@@ -2,6 +2,15 @@
 
 Each release in short. Full notes are on the Modrinth page.
 
+## 23.9.8
+
+- Fixed: the license file packed inside the jar was a leftover Fabric template file (CC0). It now matches the project license, All Rights Reserved, as in LICENSE, fabric.mod.json and the README. Older jars contain the stale file by mistake
+- Builds now use fixed file order and timestamps, and the Gradle wrapper is included in the tagged source, so you can build the tag yourself and compare. The release page lists the jar's SHA-256
+- Mod behaviour is unchanged: alerts, prices and speed are the same as 23.9.7
+- Server: item names are cleaned before they go into Discord text (no links, mentions or new lines), one item that fails to draw no longer turns pictures off for everyone, at most two pictures are drawn at once, the links file is private to the server's user, and only the person who ran /auctions can use its buttons
+- Server: the free plan alert delay is now 7 seconds
+- Docs: the README, SECURITY.md and the website now say plainly that Valtrin is built with AI assistance and has not had an outside audit, and SECURITY.md lists what the optional server keeps and how far to trust it
+
 ## 23.9.7
 
 - Server: new Discord commands /auctions (a player's auction house as one picture: listings with rarity colours and stars, recent sales stamped SOLD and shown first, identical items grouped, sort and page buttons, optional profile), /link, /unlink and /notify (a DM when one of your auctions sells, off until you turn it on). Built only from Hypixel's public auction data; no API key. Mod unchanged
@@ -14,7 +23,6 @@ Each release in short. Full notes are on the Modrinth page.
 - Server: new read-only /v1/flips feed for the Valtrin website. It needs your key, respects your plan's delay and history window, leaves out seller names, and only the website's own address (siteOrigin setting) may read it from a browser
 - Server: after a restart, an account that is on the free plan now also loses a leftover Premium Plan role in Discord
 - Server: signing in with Discord again no longer turns a premium key into a free one. The new key keeps the plan the account already had
-- While the Valtrin server delivers your alerts, this computer no longer searches Hypixel, so its price data stops updating. Old prices are now hidden instead of shown: slot colours, price tooltips and the Create Auction suggestions pause (with a short note) instead of showing out-of-date numbers
 
 ## 23.9.6
 

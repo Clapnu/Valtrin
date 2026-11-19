@@ -142,7 +142,7 @@ src/main/resources/          sounds, language files, fabric.mod.json
 
 ## License
 
-Copyright (c) 2026 Valtrin. All rights reserved. The source is public so it can be read and reviewed; copying, reusing or selling it is not permitted without written permission. See [LICENSE](LICENSE).
+Copyright (c) 2026 Valtrin. All rights reserved. The source is public so it can be read and reviewed; copying, reusing or selling it is not permitted without written permission. See [LICENSE](LICENSE). Jars before 23.9.8 contain a CC0 license file by mistake (a Fabric template leftover); the license is All Rights Reserved.
 
 ## Disclaimer
 
