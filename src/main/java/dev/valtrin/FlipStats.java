@@ -250,6 +250,9 @@ public final class FlipStats {
         }
         long[] p = q.pollFirst();
         flips.add(new Flip(ts, displayNames.getOrDefault(k, item), p[1], got));
+        if (!loading && onFlipDone != null) {
+            try { onFlipDone.done(displayNames.getOrDefault(k, item), p[1], got, ts - p[0]); } catch (Throwable ignored) {}
+        }
         if (!loading) StatsReport.queue(ts, displayNames.getOrDefault(k, item), p[1], got, rarities.get(k));
     }
 
@@ -262,6 +265,11 @@ public final class FlipStats {
         } catch (IOException ignored) {
         }
     }
+
+    /** Told about every finished flip (an AH sale matched to its purchase): name, paid, got after fees, held for ms. */
+    public interface FlipDone { void done(String item, long paid, long got, long heldMs); }
+    /** Set by the mod to show "Flip done" in chat; null in tests and on the server. */
+    public static volatile FlipDone onFlipDone;
 
     public static synchronized Summary summary(long sinceMs) {
         int n = 0, wins = 0;

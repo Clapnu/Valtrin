@@ -181,6 +181,21 @@ public class ValtrinMod implements ClientModInitializer {
 
         RecipeData.init(java.nio.file.Path.of(System.getProperty("user.home"), "ValtrinData"));
         FlipStats.init(java.nio.file.Path.of(System.getProperty("user.home"), "ValtrinData"));
+        // One short line when an AH sale completes a flip, so the real profit is visible right away.
+        FlipStats.onFlipDone = (item, paid, got, heldMs) -> {
+            Minecraft mc = Minecraft.getInstance();
+            mc.execute(() -> {
+                if (mc.player == null) return;
+                long profit = got - paid;
+                long h = heldMs / 3_600_000L, m = (heldMs / 60_000L) % 60;
+                String held = h >= 48 ? (h / 24) + "d" : h > 0 ? h + "h " + m + "m" : m + "m";
+                mc.player.sendSystemMessage(V.prefix()
+                        .append(V.t("Flip done: ", V.GREY))
+                        .append(V.t(item.replaceAll("§.", ""), V.WHITE))
+                        .append(V.t("  " + (profit >= 0 ? "+" : "-") + V.compact(Math.abs(profit)), profit >= 0 ? V.GREEN : V.RED))
+                        .append(V.t("  held " + held, V.DIM)));
+            });
+        };
         ClientReceiveMessageEvents.GAME.register((message, overlay) -> {
             if (overlay || !onHypixel) return; // other servers can't feed the profit stats
             try {
@@ -280,34 +295,61 @@ public class ValtrinMod implements ClientModInitializer {
                 }
             }
 
-            int sent = 0;
-            long bestProfit = 0;
-            TimedAlert msg;
-            long cut = System.currentTimeMillis() - MAX_ALERT_AGE_MS;
             // second note of the chime, a few ticks after the first
             if (chimeSecondTicks > 0 && --chimeSecondTicks == 0) playNote(client, 1.498f);
-            while (sent < 10 && (msg = ALERTS.poll()) != null) {
-                if (msg.at() < cut) continue; // too old: the flip is surely gone
-                client.player.sendSystemMessage(msg.msg());
-                if (msg.tag() != null) Timing.shown(msg.tag(), System.currentTimeMillis());
-                bestProfit = Math.max(bestProfit, msg.profit());
-                sent++;
-            }
-            // one sound per batch, so several alerts in the same tick don't stack into noise;
-            // a big flip in the batch plays the jackpot instead of the chime
-            if (sent > 0 && FlipConfig.INSTANCE.soundEnabled
-                    && !FlipConfig.INSTANCE.isQuiet(java.time.LocalTime.now().getHour())) {
-                FlipConfig fc = FlipConfig.INSTANCE;
-                if (fc.jackpotSound && fc.jackpotMinProfit > 0 && bestProfit >= fc.jackpotMinProfit) {
-                    playJackpot(client);
-                } else {
-                    playChime(client);
-                }
-            }
+            drainAlerts(client);
         });
 
         ClientLifecycleEvents.CLIENT_STOPPING.register(client -> { link.stop(); engine.stop(); });
 
         LOGGER.info("Valtrin loaded. Use /flip for commands.");
+    }
+
+    /** Set while a drain is queued on the game thread, so a burst of alerts queues it only once. */
+    private static final java.util.concurrent.atomic.AtomicBoolean DRAIN_QUEUED = new java.util.concurrent.atomic.AtomicBoolean();
+
+    /**
+     * Called by the alert sink the moment an alert is queued: shows it on the game thread's next frame instead of
+     * waiting for the next game tick (up to 50 ms). The tick still drains too, as a fallback.
+     */
+    static void wakeDisplay() {
+        if (!DRAIN_QUEUED.compareAndSet(false, true)) return;
+        try {
+            Minecraft mc = Minecraft.getInstance();
+            if (mc == null) { DRAIN_QUEUED.set(false); return; }
+            mc.execute(() -> {
+                DRAIN_QUEUED.set(false);
+                try { drainAlerts(mc); } catch (Throwable ignored) {}
+            });
+        } catch (Throwable t) {
+            DRAIN_QUEUED.set(false);
+        }
+    }
+
+    /** Shows queued alerts in chat (game thread only). */
+    private static void drainAlerts(Minecraft client) {
+        if (client.player == null) return;
+        int sent = 0;
+        long bestProfit = 0;
+        TimedAlert msg;
+        long cut = System.currentTimeMillis() - MAX_ALERT_AGE_MS;
+        while (sent < 10 && (msg = ALERTS.poll()) != null) {
+            if (msg.at() < cut) continue; // too old: the flip is surely gone
+            client.player.sendSystemMessage(msg.msg());
+            if (msg.tag() != null) Timing.shown(msg.tag(), System.currentTimeMillis());
+            bestProfit = Math.max(bestProfit, msg.profit());
+            sent++;
+        }
+        // one sound per batch, so several alerts in the same tick don't stack into noise;
+        // a big flip in the batch plays the jackpot instead of the chime
+        if (sent > 0 && FlipConfig.INSTANCE.soundEnabled
+                && !FlipConfig.INSTANCE.isQuiet(java.time.LocalTime.now().getHour())) {
+            FlipConfig fc = FlipConfig.INSTANCE;
+            if (fc.jackpotSound && fc.jackpotMinProfit > 0 && bestProfit >= fc.jackpotMinProfit) {
+                playJackpot(client);
+            } else {
+                playChime(client);
+            }
+        }
     }
 }

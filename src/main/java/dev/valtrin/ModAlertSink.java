@@ -37,6 +37,7 @@ final class ModAlertSink implements AlertSink {
         ServerLink l = ValtrinMod.link;
         Timing.Tag tag = remote ? Timing.remote(f, at, l == null ? 0 : l.delayMs()) : Timing.local(f);
         queue.add(new ValtrinMod.TimedAlert(msg, at, f.profit(), tag));
+        ValtrinMod.wakeDisplay(); // show on the next frame, not the next tick
     }
 
     @Override

@@ -92,7 +92,7 @@ final class ServerSettings {
                         port=8080
                         # Delay for free keys, in seconds.
                         freeDelaySeconds=7
-                        # Premium keys get 0 delay only when this is true. Keep false until Hypixel approves selling.
+                        # Premium keys get 0 delay only when this is true. Nothing is sold until it fits the rules of Hypixel and Mojang.
                         premiumEnabled=false
                         maxSessions=300
                         maxFailsPerMinute=20

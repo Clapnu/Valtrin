@@ -22,6 +22,14 @@ public final class ServerMain {
     private ServerMain() {}
 
     public static void main(String[] args) throws Exception {
+        // Speed (23.10.2). Must run before the web server and the sales store are created.
+        // Send each small alert at once instead of letting the OS hold it back to batch it with the next one.
+        if (System.getProperty("sun.net.httpserver.nodelay") == null) System.setProperty("sun.net.httpserver.nodelay", "true");
+        // Keep many more items' sales history in memory than the mod does, so a new listing almost never waits for disk.
+        // Override with -Dvaltrin.salesCacheIds=... / -Dvaltrin.pinnedIds=... if memory gets tight.
+        if (System.getProperty("valtrin.salesCacheIds") == null) System.setProperty("valtrin.salesCacheIds", "1500");
+        if (System.getProperty("valtrin.pinnedIds") == null) System.setProperty("valtrin.pinnedIds", "1200");
+        FlipEngine.stageLog = true; // one "FAST ..." line per snapshot with the time each step took
         Path home = Path.of(System.getProperty("user.home"));
         Files.createDirectories(home);
         Files.createDirectories(home.resolve("config"));

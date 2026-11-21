@@ -15,6 +15,8 @@ import java.util.Map;
  * "Median" mode uses the 7-day median sold price of the same group as the plain price instead.
  */
 final class Market {
+    private static final int PINNED_IDS = Math.max(50, Math.min(50_000, Integer.getInteger("valtrin.pinnedIds", 250)));
+
     private Market() {}
 
     /** group key -> raw BIN prices, ascending. */
@@ -66,9 +68,10 @@ final class Market {
         }
         OwnModel.setListings(byId, now);
         // Keep the sales of the most listed items in memory so new listings can be judged without waiting for disk.
+        // (PINNED_IDS: 250 in the mod; the server, which has memory to spare, keeps far more, see ServerMain.)
         OwnModel.pin(byId.entrySet().stream()
                 .sorted((x, y) -> Integer.compare(y.getValue().size(), x.getValue().size()))
-                .limit(250).map(Map.Entry::getKey).toList());
+                .limit(PINNED_IDS).map(Map.Entry::getKey).toList());
         prices = sorted(rawBy);
         norm = sorted(normBy);
         lowestIds = lowest;

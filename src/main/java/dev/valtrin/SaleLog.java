@@ -33,7 +33,8 @@ final class SaleLog {
     static final int LOAD_DAYS = 14;
     static final long MAX_BYTES = 20L * 1024 * 1024 * 1024;
     private static final long PRUNE_EVERY_MS = 24L * 3_600_000L;
-    private static final int MAX_LOADED_IDS = 600;
+    /** Items whose sales stay in memory (least recently used dropped first). The server raises it, see ServerMain. */
+    private static final int MAX_LOADED_IDS = Math.max(100, Math.min(50_000, Integer.getInteger("valtrin.salesCacheIds", 600)));
 
     record Sale(long ts, long price, String tier, String base, List<ModTokens.Tok> toks, int schema) implements OwnModel.Cand {}
 

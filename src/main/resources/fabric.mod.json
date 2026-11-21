@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "id": "valtrin",
-  "version": "23.10.1",
+  "version": "23.10.2",
   "name": "Valtrin",
   "description": "Client-side Hypixel SkyBlock auction flip alerts with customizable filters. Alerts only - no automation.",
   "authors": [

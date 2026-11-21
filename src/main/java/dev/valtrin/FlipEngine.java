@@ -242,6 +242,8 @@ final class FlipEngine {
     private static final int WINDOW_START_MS = 4_500;   // after the expected next stamp
     private static final int WINDOW_LEN_MS = 12_000;    // fine polling (200 ms) lasts this long, then 1 s catch-up polls
     private static final int PAGE0_TIMEOUT_MS = 4_000;
+    /** Gap between page-0 requests inside the window. 200 ms by default; the server can try less with -Dvaltrin.windowPollMs=100. */
+    private static final int WINDOW_POLL_MS = Math.max(100, Math.min(1000, Integer.getInteger("valtrin.windowPollMs", 200)));
     private static final HypixelApi.Key[] KEYS = HypixelApi.Key.values();
 
     /** Newest page-0 timestamp handed to the engine thread. */
@@ -321,8 +323,8 @@ final class FlipEngine {
         }
         if (inFlight.get() >= 12) return 200; // answers are not coming back: do not pile up requests
         if (known != 0 && since >= WINDOW_START_MS && since < WINDOW_START_MS + WINDOW_LEN_MS) {
-            fire(nextKey(now));      // window: one request per 200 ms, rotating the URL
-            return 200;
+            fire(nextKey(now));      // window: one request per WINDOW_POLL_MS (200 ms), rotating the URL
+            return WINDOW_POLL_MS;
         }
         // catch-up (or start-up): all URLs at once every second (every 2 s when it has gone on for minutes)
         for (HypixelApi.Key k : KEYS) if (now >= keyDisabledUntil[k.ordinal()]) fire(k);
@@ -697,8 +699,13 @@ final class FlipEngine {
         if (previous.isEmpty()) return; // first snapshot after start is only a baseline (full pass)
         long now = System.currentTimeMillis();
         long serverNow = now + HypixelApi.clockOffsetMs;
+        long[] st = stages;                           // step times of this snapshot (see logStages)
+        java.util.Arrays.fill(st, -1);
+        st[0] = now - p.receivedAtMs();               // waited for the engine thread
+        long t = System.nanoTime();
         Map<String, Auction> page = new LinkedHashMap<>();
         parsePage(p.json(), page);
+        st[1] = (System.nanoTime() - t) / 1_000_000; t = System.nanoTime();
         List<Entry> news = new ArrayList<>();
         List<Market.Row> newRows = new ArrayList<>();
         for (Auction a : page.values()) {
@@ -708,16 +715,21 @@ final class FlipEngine {
             news.add(new Entry(a, d));
             newRows.add(new Market.Row(a.price(), d));
         }
+        st[2] = (System.nanoTime() - t) / 1_000_000; t = System.nanoTime();
+        st[6] = news.size();
         // From now on these listings count as known (the full pass would otherwise judge them a second time).
         Set<String> next = new HashSet<>(previous);
         next.addAll(page.keySet());
         seen = next;
-        if (news.isEmpty()) return;
+        if (news.isEmpty()) { logStages(p); return; }
         Market.publishIncremental(newRows, now);
         for (Entry e : news) firstSeen.putIfAbsent(e.a().uuid(), now);
         List<Entry> toJudge = selectToJudge(news, previous, now, serverNow);
+        st[3] = (System.nanoTime() - t) / 1_000_000; t = System.nanoTime();
         try {
             judgeAndEmit(toJudge, serverNow);
+            st[4] = (System.nanoTime() - t) / 1_000_000;
+            logStages(p);
         } finally {
             // The fast path compared against last minute's listing table, which can still contain listings that have sold
             // since. Whatever did not alert is looked at once more against the full snapshot (see recheckFastRejects).
@@ -726,6 +738,39 @@ final class FlipEngine {
                 String u = e.a().uuid();
                 if (!alerted.containsKey(u) && !pending.containsKey(u)) fastRejected.put(u, e);
             }
+        }
+    }
+
+    /**
+     * Step times of the newest fast path, ms: [0] wait for the engine thread, [1] read page 0, [2] decode new items,
+     * [3] update the listing table, [4] judge + send, [5] snapshot received -> first alert sent (-1 = none),
+     * [6] new listings, [7] listings waiting for their sales history to load.
+     */
+    private final long[] stages = new long[8];
+    /** Write one line per snapshot with the step times (the server turns this on; the mod keeps it off). */
+    public static volatile boolean stageLog = false;
+    private final java.util.ArrayDeque<Long> firstAlertMs = new java.util.ArrayDeque<>();
+
+    private void logStages(HypixelApi.Page0 p) {
+        long[] st = stages;
+        if (st[5] >= 0) synchronized (firstAlertMs) {
+            firstAlertMs.addLast(st[5]);
+            while (firstAlertMs.size() > 60) firstAlertMs.pollFirst();
+        }
+        if (!stageLog) return;
+        Runtime rt = Runtime.getRuntime();
+        Log.LOGGER.info("FAST snap={} wait={} parse={} decode={} table={} judge+send={} first_alert={} new={} waiting_sales={} heap={}MB/{}MB median_first_alert_last_hour={}",
+                p.lastUpdated(), st[0], st[1], st[2], st[3], st[4], st[5], st[6], st[7],
+                (rt.totalMemory() - rt.freeMemory()) >> 20, rt.maxMemory() >> 20, medianFirstAlert());
+    }
+
+    /** Median of snapshot received -> first alert sent over the last 60 snapshots that had an alert, -1 = none. */
+    public long medianFirstAlert() {
+        synchronized (firstAlertMs) {
+            if (firstAlertMs.isEmpty()) return -1;
+            List<Long> l = new ArrayList<>(firstAlertMs);
+            java.util.Collections.sort(l);
+            return l.get(l.size() / 2);
         }
     }
 
@@ -947,7 +992,13 @@ final class FlipEngine {
         OwnModel.warm(ids);
         List<Entry> unready = new ArrayList<>();
         List<Entry> quick = new ArrayList<>();
-        emit(judge(toJudge, serverNow, unready, quick));
+        // Send every flip the moment it is judged, instead of judging all new listings first and then sending them
+        // together (the first flip used to wait for the whole batch).
+        for (Entry e : toJudge) {
+            List<Candidate> one = judge(List.of(e), serverNow, unready, quick);
+            if (!one.isEmpty()) emit(one);
+        }
+        stages[7] = unready.size();
         logRejectsLater(quick);
         if (!unready.isEmpty()) {
             Map<String, List<Entry>> byItem = new HashMap<>();
@@ -1070,6 +1121,7 @@ final class FlipEngine {
             // Timing tag: only for a listing that is new in the snapshot being judged now (50 ms of slack for clock steps).
             long[] snap = currentSnap;
             boolean fresh = fs != null && snap[1] > 0 && fs >= snap[1] - 50;
+            if (fresh && stages[5] < 0 && snap[1] == currentSnap[1]) stages[5] = at - snap[1];
             sink.flip(new FlipAlert(a.name(), a.tier(), a.uuid(), a.seller(), a.price(), est.sell(),
                     est.profit(), est.margin(), Market.volumeExact(c.e().d()),
                     Market.describe(c.e().d(), est) + "\n" + timing, names.get(a.seller()),

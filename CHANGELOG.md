@@ -2,6 +2,18 @@
 
 Each release in short. Full notes are on the Modrinth page.
 
+## 23.10.2
+
+- Faster alerts: an alert now shows in chat on the next frame instead of waiting for the next game tick (up to 50 ms sooner)
+- Faster alerts: each flip is sent the moment it is judged, instead of after every new listing in the snapshot has been judged
+- When an AH sale completes a flip, chat shows one line with the real profit after fees and how long you held it
+- Server: keeps far more items' sales history in memory (1,500 items, the 1,200 most listed always), so a new listing rarely waits for a disk read
+- Server: sends each alert at once instead of letting the network layer hold small messages back
+- Server: writes one "FAST" log line per snapshot with how long each step took, to find what is still slow
+- Server: the page-0 poll gap can be tried lower with -Dvaltrin.windowPollMs (default stays 200 ms)
+- Docs: the Terms, the server home page, server/README.txt and SECURITY.md now say the same thing about Premium (not available yet, only once it fits the rules of Hypixel and Mojang), and SECURITY.md covers /v1/time
+- Alerts and prices are unchanged
+
 ## 23.10.1
 
 - Fixed: while the Valtrin server delivers your alerts, the next-flip key (and /flip next, /flip recent) only opens alerts that were actually shown in your chat. Before, it could also open flips this computer found in the background but never showed
