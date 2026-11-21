@@ -156,6 +156,26 @@ public final class ServerTests {
 
         // plain requests
         check("ping with key", status(base + "/ping", free, "GET") == 200);
+        // /v1/time (for /flip ping and /flip timing in the mod)
+        {
+            long before = System.currentTimeMillis();
+            HttpResponse<String> tr = HTTP.send(HttpRequest.newBuilder(URI.create(base + "/v1/time")).header("X-Key", free).GET().build(),
+                    HttpResponse.BodyHandlers.ofString());
+            long after = System.currentTimeMillis();
+            long tv = tr.body().trim().matches("\\d{12,16}") ? Long.parseLong(tr.body().trim()) : -1;
+            check("time with key", tr.statusCode() == 200 && tv >= before && tv <= after);
+            check("time needs key", status(base + "/v1/time", null, "GET") == 401);
+            check("time post refused", status(base + "/v1/time", free, "POST") == 405);
+            // timing fields travel with a flip and come back checked
+            FlipAlert ft = new FlipAlert("T", "EPIC", "0123456789abcdef0123456789abcdef", null, 1_000_000, 2_000_000, 900_000, 90.0, 5, "d", null, "HIGH", null,
+                    1_700_000_000_000L, before - 300, before);
+            Wire.Flip wf = Wire.decodeFlip(Wire.encodeFlip(ft, before));
+            check("timing fields round-trip", wf != null && wf.alert().snap() == 1_700_000_000_000L && wf.alert().snapAt() == before - 300 && wf.alert().issuedAt() == before);
+            Wire.Flip wo = Wire.decodeFlip(Wire.encodeFlip(alert("0123456789abcdef0123456789abcdef", "Old"), before));
+            check("no timing fields = 0", wo != null && wo.alert().snap() == 0 && wo.alert().snapAt() == 0);
+            Wire.Flip wbad = Wire.decodeFlip(Wire.encodeFlip(ft, before).replace("\"snapAt\":" + (before - 300), "\"snapAt\":" + (before + 5000)));
+            check("snapAt after alert ignored", wbad != null && wbad.alert().snap() == 0);
+        }
         check("settings: settings premium default", !st.premiumEnabled && st.freeDelayMs == 1000);
         check("post refused", status(base + "/ping", free, "POST") == 405);
         check("delete refused", status(base + "/ping", free, "DELETE") == 405);

@@ -82,6 +82,8 @@ Valtrin is built by one person (Clapnu) who does not write code by hand. Claude,
 | `/flip preset <name>` | Safe, balanced or risky filters |
 | `/flip doctor` | Health check |
 | `/flip status` | Speed, data and connection |
+| `/flip timing` | How fast the first alert of each Hypixel snapshot reaches your chat |
+| `/flip ping` | Round trip between you and the Valtrin server |
 | `/flip set <option> <value>` | Change any setting from chat |
 | `/flip blacklist add\|remove <text>` | Items to never alert |
 | `/flip toggle` | Turn alerts on or off |

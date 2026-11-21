@@ -2,6 +2,21 @@
 
 Each release in short. Full notes are on the Modrinth page.
 
+## 23.10.1
+
+- Fixed: while the Valtrin server delivers your alerts, the next-flip key (and /flip next, /flip recent) only opens alerts that were actually shown in your chat. Before, it could also open flips this computer found in the background but never showed
+- Fixed: "Sent" in /flip status only counts alerts shown in your chat
+- The next-flip key never opens a sold flip: a queued flip is dropped as soon as it shows up in Hypixel's sold-auctions feed, or disappears from a complete auction snapshot
+- Your pets setting now also applies to alerts from the Valtrin server, so the server can send pet flips to players who want them without sending them to players who turned pets off
+
+## 23.10.0
+
+- New: `/flip timing` shows how fast the first alert of each Hypixel snapshot reaches your chat: median, typical range, 90% and fastest. The clock starts when Valtrin receives the snapshot, so Hypixel's own publishing time is not counted, and your plan delay is shown separately. With server alerts it is split into server, network (to you) and chat. The last 500 measurements are kept in ValtrinData/timing.tsv
+- New: `/flip ping` measures the round trip between you and the Valtrin server (5 tries after one warm-up) and checks the server's clock, which /flip timing uses for its network estimate
+- `/flip status` shows the median snapshot-to-chat time for the last hour
+- Server: alerts now carry the snapshot's Hypixel stamp and the time the server received it, and a new keyed `/v1/time` answer gives the server clock. Older mods ignore the new fields; older servers just leave the network part of /flip timing unknown
+- Alerts, prices and speed are unchanged
+
 ## 23.9.9
 
 - Settings, /flip server and /flip status now say plainly that a shared server address makes sales prices come from that server and sends your key to it. Alerts, prices and speed are unchanged

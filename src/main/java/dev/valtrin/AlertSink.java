@@ -15,6 +15,12 @@ interface AlertSink {
     /** How many alerts are still waiting to be shown (used to stop the queue growing without limit). */
     int pending();
 
+    /**
+     * False while this sink's real alerts are not shown (in the game: while the Valtrin server delivers the alerts instead).
+     * The engine then keeps them out of /flip next, /flip recent and the sent count, so those only hold alerts the player saw.
+     */
+    default boolean showsAlerts() { return true; }
+
     /** True while polling should run because the player is on Hypixel (always true on the server). */
     boolean onHypixel();
 }

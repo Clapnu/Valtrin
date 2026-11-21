@@ -273,6 +273,8 @@ final class FlipEngine {
     private final java.util.ArrayDeque<long[]> outages = new java.util.ArrayDeque<>();     // {endedAt, durationMs}
     private final java.util.ArrayDeque<Long> stampTimes = new java.util.ArrayDeque<>();    // page-0 stamps seen, last hour
     private volatile long currentDetectAt = 0;
+    /** {Hypixel stamp, local time received} of the snapshot being judged now, for /flip timing. Replaced as one array. */
+    private volatile long[] currentSnap = {0L, 0L};
 
     private void auctionTick() {
         if (!running) return;
@@ -553,6 +555,7 @@ final class FlipEngine {
     /** Engine thread: judge the new listings of this page 0 at once, then do the full download. */
     private void onNewStamp(HypixelApi.Page0 p) {
         currentDetectAt = p.receivedAtMs();
+        currentSnap = new long[]{p.lastUpdated(), p.receivedAtMs()};
         try {
             fastPath(p);
         } catch (Exception e) {
@@ -885,6 +888,7 @@ final class FlipEngine {
         // alerted late, with a wrong "seen" time): for such a snapshot the old listings stay known.
         Set<String> nowSeen = new HashSet<>(all.keySet());
         if (partialSnapshot) nowSeen.addAll(previous);
+        else FlipQueue.dropMissing(previous, all.keySet()); // gone from a complete snapshot = sold or taken down
         seen = nowSeen;
         tracked = all.size();
         lastRefreshAt = now;
@@ -1063,14 +1067,22 @@ final class FlipEngine {
             Long fs = firstSeen.get(a.uuid());
             String timing = "Listed " + ago((serverNow - a.start()) / 1000) + " ago, seen by Valtrin "
                     + ago(fs == null ? 0 : (at - fs) / 1000) + " ago";
+            // Timing tag: only for a listing that is new in the snapshot being judged now (50 ms of slack for clock steps).
+            long[] snap = currentSnap;
+            boolean fresh = fs != null && snap[1] > 0 && fs >= snap[1] - 50;
             sink.flip(new FlipAlert(a.name(), a.tier(), a.uuid(), a.seller(), a.price(), est.sell(),
                     est.profit(), est.margin(), Market.volumeExact(c.e().d()),
                     Market.describe(c.e().d(), est) + "\n" + timing, names.get(a.seller()),
-                    alertConf(c.e().d()), SellTime.forFlip(c.e().d(), a.price(), est)), at, true);
-            FlipQueue.add(new FlipQueue.Item(a.uuid(), a.name(), a.price(), est.profit(), at));
-            AlertHistory.add(a.uuid(), a.name(), a.tier(), a.price(), est.profit(), at);
+                    alertConf(c.e().d()), SellTime.forFlip(c.e().d(), a.price(), est),
+                    fresh ? snap[0] : 0L, fresh ? snap[1] : 0L, at), at, true);
+            // Only alerts the player actually sees go into /flip next, /flip recent and the sent count. While the Valtrin
+            // server delivers the alerts, this computer's own finds are hidden, so they must not be opened by the next-flip key.
+            if (sink.showsAlerts()) {
+                FlipQueue.add(new FlipQueue.Item(a.uuid(), a.name(), a.price(), est.profit(), at));
+                AlertHistory.add(a.uuid(), a.name(), a.tier(), a.price(), est.profit(), at);
+                alertsSent++;
+            }
             writeAlertLog(a, est, fs, at, serverNow);
-            alertsSent++;
             if (fs != null) {
                 synchronized (this) {
                     alertLagMs.addLast(at - fs);
@@ -1202,6 +1214,7 @@ final class FlipEngine {
                 String id = a.get("auction_id").getAsString();
                 ids.add(id);
                 if (lastEndedIds.contains(id)) continue;
+                FlipQueue.markGone(id); // sold: the next-flip key must never open it
                 AuctionFeed.sale(a);
                 if (!a.has("bin") || !a.get("bin").getAsBoolean()) continue;
 

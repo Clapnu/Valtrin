@@ -36,8 +36,9 @@ public class ValtrinMod implements ClientModInitializer {
     }
 
     /** An alert and the time it was made, so alerts that waited too long (loading screen, menu) can be dropped. */
-    public record TimedAlert(Component msg, long at, long profit) {
-        public TimedAlert(Component msg, long at) { this(msg, at, 0L); }
+    public record TimedAlert(Component msg, long at, long profit, Timing.Tag tag) {
+        public TimedAlert(Component msg, long at) { this(msg, at, 0L, null); }
+        public TimedAlert(Component msg, long at, long profit) { this(msg, at, profit, null); }
     }
 
     /** Alerts older than this when the player can finally see them are dropped (the listing is long gone). */
@@ -153,10 +154,11 @@ public class ValtrinMod implements ClientModInitializer {
 
         VolumeTracker volume = new VolumeTracker();
         volume.load();
+        Timing.init(java.nio.file.Path.of(System.getProperty("user.home"), "ValtrinData", "timing.tsv"));
         ModAlertSink alertSink = new ModAlertSink(ALERTS);
         engine = new FlipEngine(volume, alertSink);
         // The server link gets its own sink that never drops anything; the local engine's sink drops its alerts while the server delivers them.
-        link = new ServerLink(new ModAlertSink(ALERTS));
+        link = new ServerLink(new ModAlertSink(ALERTS, true));
         alertSink.setLink(link);
         Market.serverMode = ValtrinMod::serverConnected;
         engine.start();
@@ -287,6 +289,7 @@ public class ValtrinMod implements ClientModInitializer {
             while (sent < 10 && (msg = ALERTS.poll()) != null) {
                 if (msg.at() < cut) continue; // too old: the flip is surely gone
                 client.player.sendSystemMessage(msg.msg());
+                if (msg.tag() != null) Timing.shown(msg.tag(), System.currentTimeMillis());
                 bestProfit = Math.max(bestProfit, msg.profit());
                 sent++;
             }

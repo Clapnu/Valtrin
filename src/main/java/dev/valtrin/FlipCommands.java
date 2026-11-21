@@ -31,6 +31,8 @@ final class FlipCommands {
         return literal("flip")
                 .executes(c -> status(c.getSource()))
                 .then(literal("status").executes(c -> status(c.getSource())))
+                .then(literal("timing").executes(c -> timing(c.getSource())))
+                .then(literal("ping").executes(c -> ping(c.getSource())))
                 .then(literal("snapshots").executes(c -> snapshots(c.getSource())))
                 .then(literal("why")
                         .executes(c -> why(c.getSource(), ""))
@@ -469,6 +471,127 @@ final class FlipCommands {
         return 1;
     }
 
+    // ---------------------------------------------------------------- timing and ping
+
+    /** Totals (snapshot received to chat, plan delay left out) of the measured snapshots since {@code from}, or null. */
+    private static Timing.Stats timingTotals(long from) {
+        long off = Timing.offset();
+        java.util.List<Long> v = new java.util.ArrayList<>();
+        for (Timing.Row r : Timing.since(from)) v.add(r.total(off));
+        return Timing.stats(v);
+    }
+
+    /** /flip timing: how long the first alert of each Hypixel snapshot takes to reach this player's chat. */
+    private static int timing(FabricClientCommandSource src) {
+        long now = System.currentTimeMillis();
+        java.util.List<Timing.Row> rows = Timing.since(now - 24 * 3_600_000L);
+        String window = "last 24 h";
+        if (rows.isEmpty()) {
+            rows = Timing.since(0);
+            window = "saved";
+        }
+        src.sendFeedback(V.title("Timing", "first alert per snapshot"));
+        src.sendFeedback(V.rule());
+        if (rows.isEmpty()) {
+            src.sendFeedback(V.t("Nothing measured yet. The first alert you see from each new Hypixel snapshot is timed; "
+                    + "check back after a few alerts.", V.GREY));
+            return 1;
+        }
+        long off = Timing.offset();
+        boolean anyRemote = false, anyLocal = false;
+        java.util.List<Long> total = new java.util.ArrayList<>(), server = new java.util.ArrayList<>(),
+                net = new java.util.ArrayList<>(), shown = new java.util.ArrayList<>();
+        long delay = 0;
+        for (Timing.Row r : rows) {
+            total.add(r.total(off));
+            server.add(r.server());
+            shown.add(r.display());
+            if (r.remote()) {
+                anyRemote = true;
+                net.add(r.network(off));
+                delay = Math.max(delay, r.delay());
+            } else {
+                anyLocal = true;
+            }
+        }
+        Timing.Stats t = Timing.stats(total), sv = Timing.stats(server), nw = Timing.stats(net), dp = Timing.stats(shown);
+
+        java.util.List<Component> how = java.util.List.of(V.bold("How this is measured", V.GOLD),
+                V.t("Starts when Valtrin receives Hypixel's new snapshot.", V.GREY),
+                V.t("Hypixel's own time to publish it is not counted.", V.GREY),
+                V.t("Ends when the snapshot's first alert appears in your chat.", V.GREY),
+                V.t("Only listings that are new in that snapshot count.", V.GREY));
+        if (t != null) {
+            src.sendFeedback(V.hover(V.row("Snapshot → chat", V.bold(t.median() + " ms", V.GOLD), V.t(" median", V.GREY)), V.lines(how)));
+            src.sendFeedback(V.row("Typical", V.value(t.p25() + "–" + t.p75() + " ms"), V.t(" · 90% within " + t.p90() + " ms", V.GREY)));
+            src.sendFeedback(V.row("Fastest", V.value(t.best() + " ms")));
+        } else {
+            src.sendFeedback(V.hover(V.row("Snapshot → chat", V.t("waiting for a clock check", V.GREY)), V.lines(how)));
+        }
+        // the parts (medians of each part, so they need not add up exactly)
+        if (sv != null) src.sendFeedback(V.hover(V.row(anyRemote && !anyLocal ? "Server" : "Finding", V.value(sv.median() + " ms")),
+                V.t("Snapshot received → alert raised" + (anyRemote && !anyLocal ? " on the Valtrin server" : ""), V.GREY)));
+        if (anyRemote) {
+            long rtt = Timing.offsetRtt();
+            src.sendFeedback(V.hover(V.row("To you", nw == null ? V.t("? (run /flip ping)", V.GREY) : V.value(nw.median() + " ms"),
+                            rtt != Long.MAX_VALUE && nw != null ? V.t(" ±" + (rtt / 2) + " ms", V.GREY) : V.t("", V.GREY)),
+                    V.t("Server → your PC, estimated by comparing clocks with the server (exact to about half a ping).", V.GREY)));
+        }
+        if (dp != null) src.sendFeedback(V.hover(V.row("Into chat", V.value(dp.median() + " ms")),
+                V.t("Alert received → shown in chat (the next game tick).", V.GREY)));
+        if (delay > 0) src.sendFeedback(V.row("Plan delay", V.bold((delay / 1000) + " s", V.GOLD), V.t(" on top, not counted above", V.GREY)));
+        src.sendFeedback(V.row("Snapshots", V.value(String.valueOf(rows.size())), V.t(" measured, " + window, V.GREY)));
+        src.sendFeedback(V.t("▸ ", V.PURPLE).append(V.suggest("/flip ping")).append(V.t("  medians of each part, so they need not add up", V.DIM)));
+        return 1;
+    }
+
+    /** /flip ping: round trip between this PC and the Valtrin server (5 timed tries after one warm-up). Runs off the game thread. */
+    private static int ping(FabricClientCommandSource src) {
+        ServerLink l = ValtrinMod.link;
+        if (l == null || !ServerLink.wanted(FlipConfig.INSTANCE)) {
+            reply(src, "Not using a Valtrin server. Turn on Alerts from the server in /flip menu (Advanced).", ChatFormatting.RED);
+            return 0;
+        }
+        reply(src, "Pinging the Valtrin server...", ChatFormatting.GRAY);
+        net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
+        Thread.ofVirtual().start(() -> {
+            java.util.List<Component> out = new java.util.ArrayList<>();
+            try {
+                l.timeSample(); // warm-up: opens the connection (TLS), not counted
+                java.util.List<Long> rtts = new java.util.ArrayList<>();
+                for (int i = 0; i < 5; i++) {
+                    Thread.sleep(150);
+                    ServerLink.TimeSample s = l.timeSample();
+                    rtts.add(s.rtt());
+                    Timing.sync(s.t0(), s.serverNow(), s.t1());
+                }
+                Timing.Stats st = Timing.stats(rtts);
+                out.add(V.title("Ping", null));
+                out.add(V.rule());
+                out.add(V.hover(V.row("Ping", V.bold(st.median() + " ms", V.GOLD), V.t(" median of 5 · best " + st.best() + " ms", V.GREY)),
+                        V.t("Your PC → Valtrin server → your PC. An alert only travels one way, about half of this.", V.GREY)));
+                long off = Timing.offset();
+                if (off != Long.MIN_VALUE) {
+                    out.add(V.hover(V.row("Clocks", V.value((off >= 0 ? "+" : "") + off + " ms"), V.t(" server vs this PC", V.GREY)),
+                            V.t("Used by /flip timing to split server time from network time. It does not change anything else.", V.GREY)));
+                }
+                out.add(V.t("▸ ", V.PURPLE).append(V.suggest("/flip timing")));
+            } catch (ServerLink.TimeError e) {
+                String why = switch (e.getMessage()) {
+                    case "old server" -> "This server is too old for /flip ping (it needs the 23.10 server).";
+                    case "key refused" -> "The server refused your key.";
+                    case "no answer" -> "No answer from the server.";
+                    default -> "Ping failed: " + e.getMessage() + ".";
+                };
+                out.add(V.prefix().append(V.t(why, V.RED)));
+            } catch (InterruptedException e) {
+                return;
+            }
+            mc.execute(() -> { for (Component c : out) src.sendFeedback(c); });
+        });
+        return 1;
+    }
+
     private static String signed(long v) {
         return (v >= 0 ? "+" : "") + Format.compact(v);
     }
@@ -477,6 +600,8 @@ final class FlipCommands {
         src.sendFeedback(V.title("Commands", null));
         src.sendFeedback(V.rule());
         src.sendFeedback(cmd("/flip status", "/flip status", "health and speed"));
+        src.sendFeedback(cmd("/flip timing", "/flip timing", "how fast the first alert of each snapshot reaches you"));
+        src.sendFeedback(cmd("/flip ping", "/flip ping", "round trip between you and the Valtrin server"));
         src.sendFeedback(cmd("/flip profit", "/flip profit ", "<1-14> or all"));
         src.sendFeedback(cmd("/flip mute", "/flip mute", "stop alerts for the item of your latest alert"));
         src.sendFeedback(cmd("/flip export", "/flip export", "save your finished flips as a CSV file"));
@@ -689,6 +814,14 @@ final class FlipCommands {
             long am = e.alertMedianMs();
             src.sendFeedback(V.hover(V.row("Alert in", am < 0 ? V.t("-", V.GREY) : V.bold(am + " ms", V.GOLD)), V.lines(speed)));
             src.sendFeedback(V.hover(V.row("Tracking", V.value(String.format(L, "%,d", e.tracked)), V.t(" auctions", V.GREY)), V.lines(data)));
+        }
+        Timing.Stats ts = timingTotals(System.currentTimeMillis() - 3_600_000L);
+        if (ts != null) {
+            src.sendFeedback(V.hover(V.row("Snapshot → chat", V.bold(ts.median() + " ms", V.GOLD), V.t(" median, last hour", V.GREY)),
+                    V.lines(java.util.List.of(V.bold("First alert per snapshot", V.GOLD),
+                            V.t("From Valtrin receiving Hypixel's new snapshot to the alert in your chat.", V.GREY),
+                            V.t("Hypixel's own publishing time and your plan delay are not counted.", V.GREY),
+                            V.t("Details: /flip timing", V.GREY)))));
         }
         long sentTotal = e.alertsSent + (sl == null ? 0 : sl.flipsShown());
         src.sendFeedback(V.row("Sent", V.value(String.valueOf(sentTotal)), V.t(" alerts this session", V.GREY)));

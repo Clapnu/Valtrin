@@ -6,9 +6,16 @@ import java.util.Queue;
 /** The in-game sink: turns the engine's alerts into the same chat alerts as before and queues them for the client thread. */
 final class ModAlertSink implements AlertSink {
     private final Queue<ValtrinMod.TimedAlert> queue;
+    /** True for the sink of the server connection (its alerts were found by the server, not this computer). */
+    private final boolean remote;
 
     ModAlertSink(Queue<ValtrinMod.TimedAlert> queue) {
+        this(queue, false);
+    }
+
+    ModAlertSink(Queue<ValtrinMod.TimedAlert> queue, boolean remote) {
         this.queue = queue;
+        this.remote = remote;
     }
 
     @Override
@@ -23,7 +30,13 @@ final class ModAlertSink implements AlertSink {
         SellerClick.remember(f.uuid(), f.sellerUuid(), f.sellerName());
         var msg = FlipAlerts.build(f.name(), f.tier(), f.uuid(), f.buy(), f.sell(), f.profit(), f.margin(), f.volume(),
                 f.detail(), f.sellerName(), f.conf(), f.resale());
-        queue.add(real ? new ValtrinMod.TimedAlert(msg, at, f.profit()) : new ValtrinMod.TimedAlert(msg, at));
+        if (!real) {
+            queue.add(new ValtrinMod.TimedAlert(msg, at));
+            return;
+        }
+        ServerLink l = ValtrinMod.link;
+        Timing.Tag tag = remote ? Timing.remote(f, at, l == null ? 0 : l.delayMs()) : Timing.local(f);
+        queue.add(new ValtrinMod.TimedAlert(msg, at, f.profit(), tag));
     }
 
     @Override
@@ -35,6 +48,11 @@ final class ModAlertSink implements AlertSink {
 
     void setLink(ServerLink l) {
         this.link = l;
+    }
+
+    @Override
+    public boolean showsAlerts() {
+        return !serverDelivers();
     }
 
     /** True while the Valtrin server is delivering the alerts. */

@@ -8,6 +8,7 @@ connected mod (after that key's delay). It never buys anything and never sends c
 Web interface (all need the header  X-Key: <access key>; GET, except where noted):
     /v1/stream      alerts, as server-sent events (events: hello, flip, notice). One connection per key.
     /ping           "ok"
+    /v1/time        the server clock in ms (plain number), for /flip ping and /flip timing in the mod
     /v1/flips       recent flips as JSON for the website (needs X-Key, delay and history follow the plan, no seller names; browser access only from siteOrigin)
     /v1/craft       crafts that currently look profitable, as JSON for the website (premium keys only, same browser rule as /v1/flips)
     /v1/stats       completed flips a player chose to share from the mod (premium keys only): POST from the mod, GET and DELETE from the website

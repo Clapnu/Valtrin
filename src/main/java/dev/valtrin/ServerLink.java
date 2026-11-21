@@ -206,6 +206,7 @@ final class ServerLink {
                 state = State.CONNECTED;
                 detail = h.tier().toLowerCase(Locale.ROOT) + (h.delayMs() > 0 ? ", " + (h.delayMs() / 1000) + " s delay" : ", no delay");
                 Log.LOGGER.info("Connected to Valtrin server ({})", detail);
+                syncClockLater(); // for /flip timing; a server without /v1/time simply answers 404
             }
             case "flip" -> {
                 Wire.Flip f = Wire.decodeFlip(ev.data());
@@ -221,6 +222,7 @@ final class ServerLink {
 
     private void onFlip(FlipAlert f) {
         long now = System.currentTimeMillis();
+        if (f.snap() > 0 && Timing.syncDue()) syncClockLater();
         if (!accept(f, FlipConfig.INSTANCE)) return;
         synchronized (this) {
             if (now - windowStart > 1000) { windowStart = now; windowCount = 0; }
@@ -236,7 +238,75 @@ final class ServerLink {
         AlertHistory.add(f.uuid(), f.name(), f.tier(), f.buy(), f.profit(), now);
     }
 
+    // ------------------------------------------------------------------ clock check and ping (/flip ping, /flip timing)
+
+    private final HttpClient pingHttp = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5))
+            .followRedirects(HttpClient.Redirect.NEVER).build();
+    private final java.util.concurrent.atomic.AtomicBoolean syncing = new java.util.concurrent.atomic.AtomicBoolean();
+
+    /** Result of one /v1/time request: sent at t0 and answered at t1 (this PC's clock), the server's clock in between. */
+    record TimeSample(long t0, long serverNow, long t1) {
+        long rtt() { return t1 - t0; }
+    }
+
+    /** Why a time request failed, for /flip ping. */
+    static final class TimeError extends Exception {
+        TimeError(String msg) { super(msg); }
+    }
+
+    /**
+     * Asks the server for its clock once (GET /v1/time with the key). Blocking: never call this on the game thread.
+     * Uses the same address and key as the alert connection and never follows a redirect.
+     */
+    TimeSample timeSample() throws TimeError {
+        FlipConfig c = FlipConfig.INSTANCE;
+        if (!wanted(c)) throw new TimeError("not set up");
+        String base = c.sharedUrl.trim();
+        String root = base.endsWith("/") ? base.substring(0, base.length() - 1) : base;
+        HttpRequest req = HttpRequest.newBuilder(URI.create(root + "/v1/time")).timeout(Duration.ofSeconds(5))
+                .header("X-Key", c.sharedKey).GET().build();
+        long t0 = System.currentTimeMillis();
+        HttpResponse<String> resp;
+        try {
+            resp = pingHttp.send(req, HttpResponse.BodyHandlers.ofString());
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new TimeError("interrupted");
+        } catch (IOException e) {
+            throw new TimeError("no answer");
+        }
+        long t1 = System.currentTimeMillis();
+        if (resp.statusCode() == 404) throw new TimeError("old server");
+        if (resp.statusCode() == 401) throw new TimeError("key refused");
+        if (resp.statusCode() != 200) throw new TimeError("server answered " + resp.statusCode());
+        String body = resp.body() == null ? "" : resp.body().trim();
+        if (body.length() > 20 || !body.matches("\\d{12,16}")) throw new TimeError("odd answer");
+        long server = Long.parseLong(body);
+        if (Math.abs(server - t1) > 86_400_000L) throw new TimeError("server clock is far off");
+        return new TimeSample(t0, server, t1);
+    }
+
+    /** Checks the server clock in the background (3 tries, the shortest round trip wins). At most one at a time. */
+    void syncClockLater() {
+        if (!syncing.compareAndSet(false, true)) return;
+        Thread.ofVirtual().start(() -> {
+            try {
+                for (int i = 0; i < 3; i++) {
+                    TimeSample s = timeSample();
+                    if (i > 0) Timing.sync(s.t0(), s.serverNow(), s.t1()); // the first one also opens the connection
+                    Thread.sleep(200);
+                }
+            } catch (Exception ignored) {
+            } finally {
+                syncing.set(false);
+            }
+        });
+    }
+
     /** The player's own filters, applied to what the server sent. Only ever stricter than the server's. */
+    /** Pet alerts are named like "[Lvl 100] Ender Dragon". */
+    private static final java.util.regex.Pattern PET_NAME = java.util.regex.Pattern.compile("^\\[Lvl \\d{1,3}\\] ");
+
     static boolean accept(FlipAlert f, FlipConfig c) {
         if (!c.enabled) return false;
         if (f.profit() < c.minProfit) return false;
@@ -244,6 +314,7 @@ final class ServerLink {
         if (f.volume() >= 0 && f.volume() < c.minVolume) return false;
         if (OwnModel.confRank(f.conf()) < OwnModel.confRank(String.valueOf(c.minConfidence).toUpperCase(Locale.ROOT))) return false;
         if (c.maxPrice > 0 && f.buy() > c.maxPrice) return false;
+        if (!c.includePets && PET_NAME.matcher(f.name()).find()) return false; // pets off: the server may send pets for others
         String lower = f.name().toLowerCase(Locale.ROOT);
         for (String b : c.blacklist) if (b != null && !b.isBlank() && lower.contains(b.toLowerCase(Locale.ROOT))) return false;
         return true;

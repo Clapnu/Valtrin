@@ -31,6 +31,11 @@ final class Wire {
     static String encodeFlip(FlipAlert f, long at) {
         JsonObject o = new JsonObject();
         o.addProperty("at", at);
+        // timing for /flip timing (server clock); left out when unknown
+        if (f.snap() > 0 && f.snapAt() > 0) {
+            o.addProperty("snap", f.snap());
+            o.addProperty("snapAt", f.snapAt());
+        }
         o.addProperty("name", f.name());
         o.addProperty("tier", f.tier());
         o.addProperty("uuid", f.uuid());
@@ -108,8 +113,11 @@ final class Wire {
                 Long rpr = num(ro, "profit", -MAX_COINS, MAX_COINS), rph = num(ro, "perHour", -MAX_COINS, MAX_COINS);
                 if (rp != null && rm != null && rpr != null && rph != null) resale = new SellTime.Resale(rp, rm, rpr, rph);
             }
+            // Optional timing fields (older servers do not send them). Only used for /flip timing, never for anything else.
+            Long snap = num(o, "snap", 1, Long.MAX_VALUE / 4), snapAt = num(o, "snapAt", 1, Long.MAX_VALUE / 4);
+            boolean timed = snap != null && snapAt != null && snapAt <= at && at - snapAt < 600_000L;
             return new Flip(new FlipAlert(name, tier, uuid, sellerUuid, buy, sell, profit, margin, volume, detail,
-                    sellerName, conf, resale), at);
+                    sellerName, conf, resale, timed ? snap : 0L, timed ? snapAt : 0L, at), at);
         } catch (RuntimeException e) {
             return null;
         }

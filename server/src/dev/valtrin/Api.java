@@ -21,6 +21,7 @@ import java.util.concurrent.TimeUnit;
  * The server's web interface. Every request needs a valid access key in the X-Key header.
  *   GET /v1/stream   server-sent events: hello, flip, notice (one connection per key)
  *   GET /ping        "ok"
+ *   GET /v1/time     the server's clock in milliseconds (plain number), for /flip ping and /flip timing in the mod
  *   GET /sales?id=ITEM&days=N, GET /coverage?days=N   the sales history used for pricing
  * Only GET is accepted. Keys are never logged. Failed attempts are rate-limited per client address, and a key that
  * asks for sales too fast is slowed down. Meant to sit behind Caddy (HTTPS) on 127.0.0.1.
@@ -147,6 +148,7 @@ final class Api {
             String path = ex.getRequestURI().getPath();
             switch (path) {
                 case "/ping" -> reply(ex, 200, "ok");
+                case "/v1/time" -> reply(ex, 200, String.valueOf(System.currentTimeMillis()));
                 case "/v1/stream" -> stream(ex, entry, ip);
                 case "/v1/flips" -> {
                     if (!takeToken(entry.hash())) {
