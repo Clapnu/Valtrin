@@ -8,6 +8,7 @@ Each release in short. Full notes are on the Modrinth page.
 - Fixed: "Sent" in /flip status only counts alerts shown in your chat
 - The next-flip key never opens a sold flip: a queued flip is dropped as soon as it shows up in Hypixel's sold-auctions feed, or disappears from a complete auction snapshot
 - Your pets setting now also applies to alerts from the Valtrin server, so the server can send pet flips to players who want them without sending them to players who turned pets off
+- Docs: the Terms, the server home page, server/README.txt and SECURITY.md now say the same thing about Premium (not available yet, only once it fits the rules of Hypixel and Mojang), and SECURITY.md covers /v1/time
 
 ## 23.10.0
 

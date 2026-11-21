@@ -18,7 +18,7 @@ Settings: config/valtrin-server.properties (made on first start, inside the data
     bind=127.0.0.1          keep this when Caddy (HTTPS) is in front
     port=8080
     freeDelaySeconds=7      delay for FREE keys
-    premiumEnabled=false    premium keys get no delay ONLY when this is true; leave false until Hypixel has approved selling
+    premiumEnabled=false    premium keys get no delay ONLY when this is true; leave false until selling fits the rules of Hypixel and Mojang
     maxSessions=300
     maxFailsPerMinute=20    wrong-key attempts per address before it is blocked for the rest of the minute
 
